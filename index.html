@@ -1,0 +1,1840 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>眸影碎境 GazeShards</title>
+  <link rel="icon" href="data:,">
+  <style>
+    :root {
+      color-scheme: dark;
+      --panel-bg: rgba(8, 10, 14, 0.76);
+      --panel-border: rgba(255, 255, 255, 0.14);
+      --text: rgba(255, 255, 255, 0.92);
+      --muted: rgba(255, 255, 255, 0.58);
+      --accent: #7df9ff;
+      --accent-strong: #ff4fd8;
+      --shadow: rgba(0, 0, 0, 0.34);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      overflow: hidden;
+      background: #000;
+      color: var(--text);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      letter-spacing: 0;
+    }
+
+    body {
+      touch-action: none;
+      user-select: none;
+    }
+
+    button,
+    input {
+      font: inherit;
+    }
+
+    #mainCanvas {
+      position: fixed;
+      inset: 0;
+      width: 100vw;
+      height: 100vh;
+      display: block;
+      touch-action: none;
+      background: #000;
+    }
+
+    #startOverlay {
+      position: fixed;
+      inset: 0;
+      z-index: 20;
+      display: grid;
+      place-items: center;
+      padding: 24px;
+      background:
+        radial-gradient(circle at 52% 42%, rgba(125, 249, 255, 0.12), transparent 26%),
+        radial-gradient(circle at 42% 58%, rgba(255, 79, 216, 0.10), transparent 24%),
+        rgba(0, 0, 0, 0.72);
+      transition: opacity 180ms ease, visibility 180ms ease;
+    }
+
+    #startOverlay.hidden {
+      opacity: 0;
+      visibility: hidden;
+      pointer-events: none;
+    }
+
+    .startPanel {
+      width: min(520px, calc(100vw - 40px));
+      display: grid;
+      gap: 16px;
+      justify-items: center;
+      text-align: center;
+    }
+
+    .startPanel h1 {
+      margin: 0;
+      font-size: clamp(38px, 7vw, 78px);
+      line-height: 0.95;
+      font-weight: 760;
+    }
+
+    .startPanel p {
+      max-width: 420px;
+      margin: 0;
+      color: var(--muted);
+      font-size: 16px;
+      line-height: 1.5;
+    }
+
+    .primaryButton,
+    .controlButton,
+    .fileControl {
+      min-height: 42px;
+      border: 1px solid var(--panel-border);
+      border-radius: 8px;
+      color: var(--text);
+      background: rgba(255, 255, 255, 0.08);
+      box-shadow: 0 12px 30px var(--shadow);
+    }
+
+    .primaryButton {
+      min-width: 184px;
+      padding: 0 22px;
+      color: #061114;
+      background: linear-gradient(135deg, var(--accent), #f8ff96);
+      border: 0;
+      font-weight: 760;
+      cursor: pointer;
+    }
+
+    .controlButton {
+      min-width: 108px;
+      padding: 0 14px;
+      cursor: pointer;
+      backdrop-filter: blur(14px);
+    }
+
+    .controlButton:disabled,
+    .fileControl[aria-disabled="true"] {
+      opacity: 0.48;
+      cursor: not-allowed;
+    }
+
+    #controls {
+      position: fixed;
+      right: max(16px, env(safe-area-inset-right));
+      bottom: max(16px, env(safe-area-inset-bottom));
+      z-index: 10;
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+      gap: 10px;
+      max-width: min(520px, calc(100vw - 32px));
+      padding: 10px;
+      border: 1px solid var(--panel-border);
+      border-radius: 8px;
+      background: var(--panel-bg);
+      backdrop-filter: blur(18px);
+      transition: background 160ms ease, border-color 160ms ease;
+    }
+
+    body.ui-hidden #controls {
+      background: transparent;
+      border-color: transparent;
+      padding: 0;
+    }
+
+    body.ui-hidden #controls .stageControl {
+      display: none;
+    }
+
+    .fileControl {
+      position: relative;
+      width: 178px;
+      padding: 10px 12px;
+      color: var(--muted);
+      overflow: hidden;
+      white-space: nowrap;
+      cursor: pointer;
+      backdrop-filter: blur(14px);
+    }
+
+    .fileControl input {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      opacity: 0;
+      cursor: pointer;
+    }
+
+    #toast {
+      position: fixed;
+      left: 50%;
+      bottom: max(84px, calc(env(safe-area-inset-bottom) + 84px));
+      z-index: 12;
+      width: min(520px, calc(100vw - 32px));
+      padding: 12px 14px;
+      border: 1px solid var(--panel-border);
+      border-radius: 8px;
+      color: var(--text);
+      background: var(--panel-bg);
+      box-shadow: 0 18px 44px var(--shadow);
+      transform: translateX(-50%) translateY(20px);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 160ms ease, transform 160ms ease;
+      backdrop-filter: blur(18px);
+      font-size: 14px;
+      line-height: 1.45;
+      text-align: center;
+    }
+
+    #toast.visible {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+
+    #debugPanel {
+      position: fixed;
+      top: max(16px, env(safe-area-inset-top));
+      right: max(16px, env(safe-area-inset-right));
+      z-index: 10;
+      min-width: 230px;
+      max-width: calc(100vw - 32px);
+      padding: 12px;
+      border: 1px solid var(--panel-border);
+      border-radius: 8px;
+      background: var(--panel-bg);
+      color: var(--text);
+      font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+      font-size: 12px;
+      line-height: 1.55;
+      white-space: pre-line;
+      backdrop-filter: blur(18px);
+    }
+
+    body.ui-hidden #debugPanel {
+      display: none;
+    }
+
+    @media (max-width: 560px) {
+      #controls {
+        left: 12px;
+        right: 12px;
+      }
+
+      .controlButton,
+      .fileControl {
+        flex: 1 1 132px;
+        min-width: 0;
+      }
+
+      body.ui-hidden #controls {
+        left: auto;
+      }
+
+      #toast {
+        bottom: 88px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <canvas id="mainCanvas"></canvas>
+
+  <div id="startOverlay">
+    <div class="startPanel">
+      <h1>眸影碎境</h1>
+      <p>授权摄像头后，用拇指和食指捏合抓住眼睛切片，拖动甩开；眨眼会触发重组效果。</p>
+      <button id="startBtn" class="primaryButton" type="button">开始体验</button>
+    </div>
+  </div>
+
+  <div id="controls">
+    <button id="toggleUiBtn" class="controlButton" type="button">隐藏界面</button>
+    <button id="toggleDebugBtn" class="controlButton stageControl" type="button">关闭调试</button>
+    <button id="flipCameraBtn" class="controlButton stageControl" type="button">切换镜头</button>
+    <label class="fileControl stageControl" aria-disabled="false">
+      <span id="mediaUploadLabel">上传图片/视频</span>
+      <input id="mediaUpload" type="file" accept="image/*,video/*">
+    </label>
+  </div>
+
+  <div id="debugPanel"></div>
+  <div id="toast" role="status" aria-live="polite"></div>
+
+  <script>
+    // =====================================================
+    // 0. CONFIG
+    // =====================================================
+    const CONFIG = {
+      targetFPS: 30,
+
+      camera: {
+        width: 1280,
+        height: 720,
+        facingMode: "user"
+      },
+
+      hand: {
+        numHands: 2,
+        pinchDownThreshold: 0.05,
+        pinchUpThreshold: 0.08,
+        handMatchRadius: 200,
+        grabRadius: 150,
+        keepLostHandMs: 200
+      },
+
+      face: {
+        maxFaces: 1,
+        eyePaddingRatio: 0.35,
+        blinkThreshold: 0.22,
+        blinkCooldownMs: 350
+      },
+
+      eyeSlices: {
+        initialCount: 8,
+        minScale: 1.2,
+        maxScale: 2.8,
+        friction: 0.94,
+        throwMultiplier: 1.0,
+        maxSpeed: 40,
+        floatNoiseAmount: 0.4
+      },
+
+      performance: {
+        handDetectEveryNFrames: 2,
+        faceDetectEveryNFrames: 6,
+        maxParticles: 160,
+        lowResScale: 0.75
+      }
+    };
+
+    // =====================================================
+    // 1. DOM REFS
+    // =====================================================
+    const canvas = document.getElementById("mainCanvas");
+    const ctx = canvas.getContext("2d");
+    const startOverlay = document.getElementById("startOverlay");
+    const startBtn = document.getElementById("startBtn");
+    const controls = document.getElementById("controls");
+    const toggleUiBtn = document.getElementById("toggleUiBtn");
+    const toggleDebugBtn = document.getElementById("toggleDebugBtn");
+    const flipCameraBtn = document.getElementById("flipCameraBtn");
+    const mediaUpload = document.getElementById("mediaUpload");
+    const mediaUploadLabel = document.getElementById("mediaUploadLabel");
+    const debugPanel = document.getElementById("debugPanel");
+    const toast = document.getElementById("toast");
+
+    // =====================================================
+    // 2. APP STATE
+    // =====================================================
+    const AppState = {
+      phase: "boot",
+      cameraReady: false,
+      mediaReady: false,
+      handReady: false,
+      faceReady: false,
+
+      useFrontCamera: true,
+      mirrored: true,
+      uiHidden: false,
+      debug: true,
+
+      canvasWidth: 0,
+      canvasHeight: 0,
+      dpr: 1,
+
+      lastFrameTime: 0,
+      fps: 0,
+      frameCount: 0,
+      startedAt: performance.now(),
+      lastDeltaTime: 1 / 60,
+
+      activeMode: "eye-slice",
+      inputMode: "fallback",
+      lastRenderLayers: [],
+      pointerActive: false,
+      activePointerId: null,
+      lastPinchEvent: "none",
+      activePinches: 0,
+      detectedHands: 0,
+      detectedFaces: 0,
+      lastBlinkTime: 0,
+      blinkState: "open",
+      eyeOpenRatio: 1,
+
+      errors: []
+    };
+
+    // =====================================================
+    // 3. SOURCE MANAGER
+    // =====================================================
+    const SourceManager = {
+      videoEl: null,
+      uploadedEl: null,
+      uploadedType: null,
+      uploadedUrl: null,
+      stream: null,
+
+      async startCamera() {
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+          const message = "当前浏览器不支持摄像头访问，已保留鼠标/触摸 fallback。";
+          AppState.errors.push(message);
+          AppState.cameraReady = false;
+          AppState.inputMode = "fallback";
+          showToast(message);
+          return false;
+        }
+
+        await this.stopCamera();
+
+        const constraints = {
+          audio: false,
+          video: {
+            width: { ideal: CONFIG.camera.width },
+            height: { ideal: CONFIG.camera.height },
+            facingMode: AppState.useFrontCamera ? "user" : "environment"
+          }
+        };
+
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia(constraints);
+          const video = document.createElement("video");
+          video.muted = true;
+          video.playsInline = true;
+          video.autoplay = true;
+          video.srcObject = stream;
+
+          await new Promise((resolve, reject) => {
+            video.onloadedmetadata = resolve;
+            video.onerror = () => reject(new Error("摄像头视频元数据加载失败。"));
+          });
+          await video.play();
+
+          this.stream = stream;
+          this.videoEl = video;
+          AppState.cameraReady = true;
+          AppState.mirrored = AppState.useFrontCamera;
+          AppState.inputMode = AppState.mediaReady ? "camera+uploaded" : "camera";
+          if (typeof EyeSliceManager !== "undefined") {
+            EyeSliceManager.createMockSlices();
+          }
+          return true;
+        } catch (error) {
+          const message = `摄像头启动失败：${error.message || error.name || "未知错误"}`;
+          AppState.errors.push(message);
+          AppState.cameraReady = false;
+          AppState.inputMode = AppState.mediaReady ? "uploaded" : "fallback";
+          showToast("摄像头没有启动成功，但页面仍可继续使用上传素材。");
+          return false;
+        }
+      },
+
+      async stopCamera() {
+        if (this.stream) {
+          this.stream.getTracks().forEach((track) => track.stop());
+        }
+        this.stream = null;
+        this.videoEl = null;
+        AppState.cameraReady = false;
+      },
+
+      async switchCamera() {
+        AppState.useFrontCamera = !AppState.useFrontCamera;
+        AppState.mirrored = AppState.useFrontCamera;
+        showToast(AppState.useFrontCamera ? "正在切换到前置镜头..." : "正在切换到后置镜头...");
+        const ok = await this.startCamera();
+        if (ok) {
+          showToast(AppState.useFrontCamera ? "已切换到前置镜头。" : "已切换到后置镜头。");
+        }
+      },
+
+      async handleUpload(file) {
+        if (!file) return false;
+
+        this.clearUploadedMedia();
+
+        const url = URL.createObjectURL(file);
+        this.uploadedUrl = url;
+
+        try {
+          if (file.type.startsWith("image/")) {
+            const img = new Image();
+            img.src = url;
+            await new Promise((resolve, reject) => {
+              img.onload = resolve;
+              img.onerror = () => reject(new Error("图片加载失败。"));
+            });
+            this.uploadedEl = img;
+            this.uploadedType = "image";
+            AppState.mediaReady = true;
+            AppState.inputMode = AppState.cameraReady ? "camera+uploaded" : "uploaded";
+            mediaUploadLabel.textContent = "已上传图片";
+            showToast("图片已作为背景素材载入。");
+            return true;
+          }
+
+          if (file.type.startsWith("video/")) {
+            const video = document.createElement("video");
+            video.src = url;
+            video.muted = true;
+            video.loop = true;
+            video.playsInline = true;
+            video.autoplay = true;
+            await new Promise((resolve, reject) => {
+              video.onloadedmetadata = resolve;
+              video.onerror = () => reject(new Error("视频加载失败。"));
+            });
+            await video.play();
+            this.uploadedEl = video;
+            this.uploadedType = "video";
+            AppState.mediaReady = true;
+            AppState.inputMode = AppState.cameraReady ? "camera+uploaded" : "uploaded";
+            mediaUploadLabel.textContent = "已上传视频";
+            showToast("视频已静音循环播放。");
+            return true;
+          }
+
+          throw new Error("只支持图片或视频文件。");
+        } catch (error) {
+          this.clearUploadedMedia();
+          const message = `上传素材失败：${error.message || "未知错误"}`;
+          AppState.errors.push(message);
+          AppState.mediaReady = false;
+          AppState.inputMode = AppState.cameraReady ? "camera" : "fallback";
+          mediaUploadLabel.textContent = "上传图片/视频";
+          showToast(message);
+          return false;
+        }
+      },
+
+      clearUploadedMedia() {
+        if (this.uploadedEl && this.uploadedType === "video") {
+          this.uploadedEl.pause();
+        }
+        if (this.uploadedUrl) {
+          URL.revokeObjectURL(this.uploadedUrl);
+        }
+        this.uploadedEl = null;
+        this.uploadedType = null;
+        this.uploadedUrl = null;
+      },
+
+      drawCamera(targetCtx) {
+        if (!AppState.cameraReady || !this.videoEl) return false;
+        drawMediaCover(targetCtx, this.videoEl, AppState.mirrored);
+        return true;
+      },
+
+      drawUploadedMedia(targetCtx) {
+        if (!AppState.mediaReady || !this.uploadedEl) return false;
+        drawMediaCover(targetCtx, this.uploadedEl, false);
+        return true;
+      }
+    };
+
+    // =====================================================
+    // 4. VISION ENGINE
+    // =====================================================
+    const THUMB_TIP = 4;
+    const INDEX_TIP = 8;
+    const WRIST = 0;
+    const LEFT_EYE_INDICES = [33, 133, 160, 159, 158, 144, 145, 153];
+    const RIGHT_EYE_INDICES = [362, 263, 387, 386, 385, 373, 374, 380];
+    const LEFT_EYE_RATIO = { left: 33, right: 133, top: 159, bottom: 145 };
+    const RIGHT_EYE_RATIO = { left: 362, right: 263, top: 386, bottom: 374 };
+
+    const HandTracker = {
+      landmarker: null,
+      ready: false,
+      lastResults: null,
+      lastHands: [],
+      lastDetectTime: 0,
+      error: null,
+
+      async init() {
+        if (this.ready) return true;
+
+        try {
+          const vision = await import("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision/vision_bundle.mjs");
+          const resolver = await vision.FilesetResolver.forVisionTasks(
+            "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision/wasm"
+          );
+          this.landmarker = await vision.HandLandmarker.createFromOptions(resolver, {
+            baseOptions: {
+              modelAssetPath: "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task",
+              delegate: "GPU"
+            },
+            runningMode: "VIDEO",
+            numHands: CONFIG.hand.numHands
+          });
+          this.ready = true;
+          this.error = null;
+          AppState.handReady = true;
+          showToast("手势识别已准备好。");
+          return true;
+        } catch (error) {
+          this.ready = false;
+          this.error = error.message || "手势模型加载失败。";
+          AppState.handReady = false;
+          AppState.errors.push(`手势识别加载失败：${this.error}`);
+          showToast("手势识别加载失败，仍可使用鼠标/触摸拖动。");
+          return false;
+        }
+      },
+
+      detect(video, timestamp) {
+        if (!this.ready || !this.landmarker || !video || video.readyState < 2) {
+          this.lastHands = [];
+          return [];
+        }
+
+        try {
+          this.lastResults = this.landmarker.detectForVideo(video, timestamp);
+          this.lastDetectTime = timestamp;
+          this.lastHands = this.normalizeResults(this.lastResults);
+          return this.lastHands;
+        } catch (error) {
+          this.error = error.message || "手势检测失败。";
+          AppState.errors.push(`手势检测失败：${this.error}`);
+          this.lastHands = [];
+          return [];
+        }
+      },
+
+      normalizeResults(results) {
+        const landmarks = results.landmarks || [];
+        return landmarks.map((points, index) => {
+          const handedness = results.handednesses?.[index]?.[0]?.categoryName
+            || results.handedness?.[index]?.[0]?.categoryName
+            || `hand-${index}`;
+          return {
+            idHint: handedness,
+            handedness,
+            landmarks: points,
+            center: this.computeCenter(points)
+          };
+        });
+      },
+
+      computeCenter(points) {
+        const wrist = points[WRIST] || points[0] || { x: 0.5, y: 0.5 };
+        return mapNormalizedPointToCanvas(wrist.x, wrist.y);
+      },
+
+      getHands() {
+        return this.lastHands;
+      }
+    };
+
+    const FaceTracker = {
+      landmarker: null,
+      ready: false,
+      lastResults: null,
+      lastFace: null,
+      lastEyeRects: [],
+      lastFaceBox: null,
+      lastDetectTime: 0,
+      lastSeenTime: 0,
+      error: null,
+
+      async init() {
+        if (this.ready) return true;
+
+        try {
+          const vision = await import("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision/vision_bundle.mjs");
+          const resolver = await vision.FilesetResolver.forVisionTasks(
+            "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision/wasm"
+          );
+          this.landmarker = await vision.FaceLandmarker.createFromOptions(resolver, {
+            baseOptions: {
+              modelAssetPath: "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/latest/face_landmarker.task",
+              delegate: "GPU"
+            },
+            runningMode: "VIDEO",
+            numFaces: CONFIG.face.maxFaces
+          });
+          this.ready = true;
+          this.error = null;
+          AppState.faceReady = true;
+          showToast("脸部识别已准备好。");
+          return true;
+        } catch (error) {
+          this.ready = false;
+          this.error = error.message || "脸部模型加载失败。";
+          AppState.faceReady = false;
+          AppState.errors.push(`脸部识别加载失败：${this.error}`);
+          showToast("脸部识别加载失败，眼睛切片仍可用 mock 模式。");
+          return false;
+        }
+      },
+
+      detect(video, timestamp) {
+        if (!this.ready || !this.landmarker || !video || video.readyState < 2) {
+          AppState.detectedFaces = 0;
+          return null;
+        }
+
+        try {
+          this.lastResults = this.landmarker.detectForVideo(video, timestamp);
+          this.lastDetectTime = timestamp;
+          const face = this.getMainFace();
+          if (!face) {
+            AppState.detectedFaces = 0;
+            if (timestamp - this.lastSeenTime > 1000) {
+              AppState.blinkState = "no-face";
+            }
+            return null;
+          }
+
+          const videoSize = getMediaSize(video);
+          this.processLandmarks(face, videoSize.width, videoSize.height, timestamp);
+          return face;
+        } catch (error) {
+          this.error = error.message || "脸部检测失败。";
+          AppState.errors.push(`脸部检测失败：${this.error}`);
+          AppState.detectedFaces = 0;
+          return null;
+        }
+      },
+
+      getMainFace() {
+        const faces = this.lastResults?.faceLandmarks || [];
+        if (!faces.length) return null;
+        return faces[0];
+      },
+
+      processLandmarks(landmarks, videoWidth, videoHeight, timestamp = performance.now()) {
+        this.lastFace = landmarks;
+        this.lastSeenTime = timestamp;
+        AppState.detectedFaces = 1;
+
+        const leftRect = this.computeEyeRect(landmarks, LEFT_EYE_INDICES, videoWidth, videoHeight, "left");
+        const rightRect = this.computeEyeRect(landmarks, RIGHT_EYE_INDICES, videoWidth, videoHeight, "right");
+        this.lastEyeRects = [leftRect, rightRect].filter(Boolean);
+        this.lastFaceBox = this.computeFaceBox(landmarks, videoWidth, videoHeight);
+
+        const leftRatio = BlinkDetector.computeEyeOpenRatio(landmarks, LEFT_EYE_RATIO);
+        const rightRatio = BlinkDetector.computeEyeOpenRatio(landmarks, RIGHT_EYE_RATIO);
+        const ratio = Math.min(leftRatio, rightRatio);
+        BlinkDetector.update(ratio, timestamp);
+        EyeSliceManager.updateEyeRects(this.lastEyeRects);
+        return this.lastEyeRects;
+      },
+
+      computeFaceBox(landmarks, videoWidth, videoHeight) {
+        let minX = 1;
+        let minY = 1;
+        let maxX = 0;
+        let maxY = 0;
+        landmarks.forEach((point) => {
+          minX = Math.min(minX, point.x);
+          minY = Math.min(minY, point.y);
+          maxX = Math.max(maxX, point.x);
+          maxY = Math.max(maxY, point.y);
+        });
+        return {
+          x: minX * videoWidth,
+          y: minY * videoHeight,
+          w: (maxX - minX) * videoWidth,
+          h: (maxY - minY) * videoHeight
+        };
+      },
+
+      computeEyeRect(landmarks, indices, videoWidth, videoHeight, side) {
+        const points = indices.map((index) => landmarks[index]).filter(Boolean);
+        if (!points.length) return null;
+
+        let minX = Math.min(...points.map((point) => point.x));
+        let maxX = Math.max(...points.map((point) => point.x));
+        let minY = Math.min(...points.map((point) => point.y));
+        let maxY = Math.max(...points.map((point) => point.y));
+
+        const width = maxX - minX;
+        const height = maxY - minY;
+        const padX = width * CONFIG.face.eyePaddingRatio;
+        const padY = Math.max(height * CONFIG.face.eyePaddingRatio, width * 0.18);
+
+        minX = Math.max(0, minX - padX);
+        maxX = Math.min(1, maxX + padX);
+        minY = Math.max(0, minY - padY);
+        maxY = Math.min(1, maxY + padY);
+
+        return {
+          x: minX * videoWidth,
+          y: minY * videoHeight,
+          w: Math.max(1, (maxX - minX) * videoWidth),
+          h: Math.max(1, (maxY - minY) * videoHeight),
+          side
+        };
+      },
+
+      getEyeRects() {
+        return this.lastEyeRects;
+      },
+
+      getBlinkState() {
+        return {
+          state: AppState.blinkState,
+          ratio: AppState.eyeOpenRatio,
+          lastBlinkTime: AppState.lastBlinkTime
+        };
+      }
+    };
+
+    const BlinkDetector = {
+      lastBlinkTime: 0,
+      wasClosed: false,
+
+      update(ratio, now) {
+        AppState.eyeOpenRatio = ratio;
+
+        if (ratio < CONFIG.face.blinkThreshold && !this.wasClosed) {
+          this.wasClosed = true;
+          AppState.blinkState = "closed";
+          return false;
+        }
+
+        if (ratio >= CONFIG.face.blinkThreshold && this.wasClosed) {
+          this.wasClosed = false;
+          AppState.blinkState = "open";
+          if (now - this.lastBlinkTime > CONFIG.face.blinkCooldownMs) {
+            this.lastBlinkTime = now;
+            AppState.lastBlinkTime = now;
+            EyeSliceManager.triggerBlinkEffect();
+            return true;
+          }
+        } else if (ratio >= CONFIG.face.blinkThreshold) {
+          AppState.blinkState = "open";
+        }
+
+        return false;
+      },
+
+      computeEyeOpenRatio(landmarks, indices) {
+        const left = landmarks[indices.left];
+        const right = landmarks[indices.right];
+        const top = landmarks[indices.top];
+        const bottom = landmarks[indices.bottom];
+        if (!left || !right || !top || !bottom) return 1;
+
+        const horizontal = Math.hypot(left.x - right.x, left.y - right.y);
+        const vertical = Math.hypot(top.x - bottom.x, top.y - bottom.y);
+        if (!horizontal) return 1;
+        return vertical / horizontal;
+      },
+
+      shouldTriggerBlink(ratio, now) {
+        return ratio >= CONFIG.face.blinkThreshold
+          && this.wasClosed
+          && now - this.lastBlinkTime > CONFIG.face.blinkCooldownMs;
+      }
+    };
+
+    const VisionEngine = {
+      ready: false,
+      handEnabled: false,
+      faceEnabled: false,
+
+      async init(options = {}) {
+        this.handEnabled = Boolean(options.hand);
+        this.faceEnabled = Boolean(options.face);
+        if (this.handEnabled) {
+          await HandTracker.init();
+        }
+        if (this.faceEnabled) {
+          await FaceTracker.init();
+        }
+        this.ready = true;
+        return true;
+      },
+
+      update(timestamp) {
+        if (!AppState.cameraReady || !SourceManager.videoEl) {
+          AppState.detectedHands = 0;
+          AppState.detectedFaces = 0;
+          PinchStateMachine.update([], timestamp);
+          return;
+        }
+
+        if (this.handEnabled && AppState.frameCount % CONFIG.performance.handDetectEveryNFrames === 0) {
+          const hands = HandTracker.detect(SourceManager.videoEl, timestamp);
+          AppState.detectedHands = hands.length;
+          PinchStateMachine.update(hands, timestamp);
+        }
+
+        if (this.faceEnabled && AppState.frameCount % CONFIG.performance.faceDetectEveryNFrames === 0) {
+          FaceTracker.detect(SourceManager.videoEl, timestamp);
+        }
+      }
+    };
+
+    // =====================================================
+    // 5. INTERACTION ENGINE
+    // =====================================================
+    let toastTimer = null;
+
+    function setPhase(nextPhase) {
+      AppState.phase = nextPhase;
+    }
+
+    function setUiHidden(hidden) {
+      AppState.uiHidden = hidden;
+      document.body.classList.toggle("ui-hidden", hidden);
+      toggleUiBtn.textContent = hidden ? "显示界面" : "隐藏界面";
+      toggleUiBtn.setAttribute("aria-pressed", String(hidden));
+    }
+
+    function setDebugEnabled(enabled) {
+      AppState.debug = enabled;
+      toggleDebugBtn.textContent = enabled ? "关闭调试" : "开启调试";
+      toggleDebugBtn.setAttribute("aria-pressed", String(enabled));
+      debugPanel.hidden = !enabled;
+      if (!enabled) {
+        debugPanel.textContent = "";
+      }
+    }
+
+    function showToast(message) {
+      toast.textContent = message;
+      toast.classList.add("visible");
+      window.clearTimeout(toastTimer);
+      toastTimer = window.setTimeout(() => {
+        toast.classList.remove("visible");
+      }, 2600);
+    }
+
+    function mapNormalizedPointToCanvas(x, y) {
+      return {
+        x: AppState.mirrored ? (1 - x) * AppState.canvasWidth : x * AppState.canvasWidth,
+        y: y * AppState.canvasHeight
+      };
+    }
+
+    function onPinchDown(x, y) {
+      AppState.lastPinchEvent = "PINCH_DOWN";
+      return EyeSliceManager.grabAt(x, y);
+    }
+
+    function onPinchDrag(x, y) {
+      AppState.lastPinchEvent = "PINCH_DRAG";
+      return EyeSliceManager.dragTo(x, y);
+    }
+
+    function onPinchUp(vx, vy) {
+      AppState.lastPinchEvent = "PINCH_UP";
+      return EyeSliceManager.release(vx, vy);
+    }
+
+    const PinchStateMachine = {
+      hands: new Map(),
+      lostHands: new Map(),
+
+      update(handResults, timestamp = performance.now()) {
+        const activeIds = new Set();
+        const hands = handResults.map((hand) => this.resolveHand(hand));
+
+        hands.forEach((hand) => {
+          activeIds.add(hand.id);
+          const previous = this.hands.get(hand.id) || {
+            id: hand.id,
+            isPinching: false,
+            lastX: hand.center.x,
+            lastY: hand.center.y,
+            vx: 0,
+            vy: 0,
+            lastTime: timestamp
+          };
+
+          const pinch = this.computePinch(hand);
+          const dt = Math.max(16, timestamp - previous.lastTime);
+          const vx = ((pinch.canvasX - previous.lastX) / dt) * 16.67;
+          const vy = ((pinch.canvasY - previous.lastY) / dt) * 16.67;
+          const state = {
+            ...previous,
+            handedness: hand.handedness,
+            landmarks: hand.landmarks,
+            pinchDistance: pinch.distance,
+            pinchX: pinch.canvasX,
+            pinchY: pinch.canvasY,
+            vx,
+            vy,
+            lastX: pinch.canvasX,
+            lastY: pinch.canvasY,
+            lastTime: timestamp,
+            lastSeen: timestamp
+          };
+
+          if (!state.isPinching && pinch.distance < CONFIG.hand.pinchDownThreshold) {
+            state.isPinching = true;
+            this.emitPinchEvents("PINCH_DOWN", state);
+          } else if (state.isPinching && pinch.distance > CONFIG.hand.pinchUpThreshold) {
+            state.isPinching = false;
+            this.emitPinchEvents("PINCH_UP", state);
+          } else if (state.isPinching) {
+            this.emitPinchEvents("PINCH_DRAG", state);
+          }
+
+          this.hands.set(hand.id, state);
+          this.lostHands.delete(hand.id);
+        });
+
+        for (const [id, state] of this.hands.entries()) {
+          if (activeIds.has(id)) continue;
+          if (!this.lostHands.has(id)) {
+            this.lostHands.set(id, timestamp);
+          }
+          if (timestamp - this.lostHands.get(id) > CONFIG.hand.keepLostHandMs) {
+            if (state.isPinching) {
+              state.isPinching = false;
+              this.emitPinchEvents("PINCH_UP", state);
+            }
+            this.hands.delete(id);
+            this.lostHands.delete(id);
+          }
+        }
+
+        AppState.activePinches = Array.from(this.hands.values()).filter((hand) => hand.isPinching).length;
+      },
+
+      resolveHand(hand) {
+        const center = hand.center || this.computeCenter(hand.landmarks);
+        const handedness = hand.handedness || hand.idHint || "hand";
+        let id = handedness;
+
+        if (!this.hands.has(id)) {
+          let bestId = null;
+          let bestDistance = CONFIG.hand.handMatchRadius;
+          for (const [candidateId, state] of this.hands.entries()) {
+            const distance = Math.hypot(center.x - state.lastX, center.y - state.lastY);
+            if (distance < bestDistance) {
+              bestDistance = distance;
+              bestId = candidateId;
+            }
+          }
+          if (bestId && !hand.idHint) {
+            id = bestId;
+          }
+        }
+
+        return { ...hand, id, center, handedness };
+      },
+
+      computeCenter(points) {
+        const wrist = points[WRIST] || points[0] || { x: 0.5, y: 0.5 };
+        return mapNormalizedPointToCanvas(wrist.x, wrist.y);
+      },
+
+      computePinch(hand) {
+        const thumb = hand.landmarks[THUMB_TIP];
+        const index = hand.landmarks[INDEX_TIP];
+        const dx = thumb.x - index.x;
+        const dy = thumb.y - index.y;
+        const distance = Math.sqrt(dx * dx + dy * dy);
+        const centerX = (thumb.x + index.x) / 2;
+        const centerY = (thumb.y + index.y) / 2;
+        const mapped = mapNormalizedPointToCanvas(centerX, centerY);
+        return {
+          distance,
+          canvasX: mapped.x,
+          canvasY: mapped.y
+        };
+      },
+
+      emitPinchEvents(type, handState) {
+        if (type === "PINCH_DOWN") {
+          onPinchDown(handState.pinchX, handState.pinchY);
+        } else if (type === "PINCH_DRAG") {
+          onPinchDrag(handState.pinchX, handState.pinchY);
+        } else if (type === "PINCH_UP") {
+          onPinchUp(handState.vx, handState.vy);
+        }
+      },
+
+      reset() {
+        this.hands.clear();
+        this.lostHands.clear();
+        AppState.activePinches = 0;
+      }
+    };
+
+    // =====================================================
+    // 6. VISUAL ELEMENT ENGINE
+    // =====================================================
+    function drawStageZeroVisual(now) {
+      const width = AppState.canvasWidth;
+      const height = AppState.canvasHeight;
+      const centerX = width * 0.5;
+      const centerY = height * 0.5;
+      const pulse = Math.sin(now * 0.0018) * 0.5 + 0.5;
+      const ringRadius = Math.min(width, height) * (0.16 + pulse * 0.015);
+
+      ctx.save();
+      ctx.translate(centerX, centerY);
+
+      ctx.globalAlpha = 0.9;
+      ctx.strokeStyle = "rgba(125, 249, 255, 0.42)";
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.ellipse(0, 0, ringRadius * 1.55, ringRadius * 0.52, 0, 0, Math.PI * 2);
+      ctx.stroke();
+
+      ctx.strokeStyle = "rgba(255, 79, 216, 0.34)";
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.ellipse(0, 0, ringRadius * 0.92, ringRadius * 0.28, 0, 0, Math.PI * 2);
+      ctx.stroke();
+
+      ctx.fillStyle = "rgba(255, 255, 255, 0.76)";
+      ctx.beginPath();
+      ctx.arc(0, 0, 4 + pulse * 4, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.restore();
+
+      ctx.save();
+      ctx.globalAlpha = 0.18;
+      ctx.strokeStyle = "rgba(255, 255, 255, 0.65)";
+      ctx.lineWidth = 1;
+      for (let i = 0; i < 12; i += 1) {
+        const y = ((now * 0.018) + i * 46) % (height + 60) - 30;
+        ctx.beginPath();
+        ctx.moveTo(0, y);
+        ctx.lineTo(width, y + Math.sin(i + now * 0.001) * 10);
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
+
+    function drawHandDebug(targetCtx) {
+      if (!AppState.debug || !PinchStateMachine.hands.size) return;
+
+      targetCtx.save();
+      for (const hand of PinchStateMachine.hands.values()) {
+        const isPinching = hand.isPinching;
+        targetCtx.fillStyle = isPinching ? "rgba(255, 79, 216, 0.92)" : "rgba(125, 249, 255, 0.88)";
+        targetCtx.strokeStyle = isPinching ? "rgba(255, 79, 216, 0.65)" : "rgba(125, 249, 255, 0.5)";
+        targetCtx.lineWidth = 2;
+
+        hand.landmarks.forEach((point, index) => {
+          const mapped = mapNormalizedPointToCanvas(point.x, point.y);
+          const radius = index === THUMB_TIP || index === INDEX_TIP ? 5 : 2.5;
+          targetCtx.beginPath();
+          targetCtx.arc(mapped.x, mapped.y, radius, 0, Math.PI * 2);
+          targetCtx.fill();
+        });
+
+        targetCtx.beginPath();
+        targetCtx.arc(hand.pinchX, hand.pinchY, CONFIG.hand.grabRadius * 0.15, 0, Math.PI * 2);
+        targetCtx.stroke();
+      }
+      targetCtx.restore();
+    }
+
+    function mapVideoRectToCanvas(rect) {
+      const videoSize = SourceManager.videoEl ? getMediaSize(SourceManager.videoEl) : null;
+      if (!videoSize) return null;
+
+      const scaleX = AppState.canvasWidth / videoSize.width;
+      const scaleY = AppState.canvasHeight / videoSize.height;
+      const x = AppState.mirrored
+        ? AppState.canvasWidth - (rect.x + rect.w) * scaleX
+        : rect.x * scaleX;
+      return {
+        x,
+        y: rect.y * scaleY,
+        w: rect.w * scaleX,
+        h: rect.h * scaleY
+      };
+    }
+
+    function drawFaceDebug(targetCtx) {
+      if (!AppState.debug) return;
+      const eyeRects = FaceTracker.getEyeRects();
+      if (!eyeRects.length && !FaceTracker.lastFaceBox) return;
+
+      targetCtx.save();
+      targetCtx.lineWidth = 2;
+      if (FaceTracker.lastFaceBox) {
+        const box = mapVideoRectToCanvas(FaceTracker.lastFaceBox);
+        if (box) {
+          targetCtx.strokeStyle = "rgba(255, 255, 255, 0.35)";
+          targetCtx.strokeRect(box.x, box.y, box.w, box.h);
+        }
+      }
+      eyeRects.forEach((rect) => {
+        const mapped = mapVideoRectToCanvas(rect);
+        if (!mapped) return;
+        targetCtx.strokeStyle = rect.side === "left"
+          ? "rgba(125, 249, 255, 0.9)"
+          : "rgba(255, 79, 216, 0.9)";
+        targetCtx.strokeRect(mapped.x, mapped.y, mapped.w, mapped.h);
+      });
+      targetCtx.restore();
+    }
+
+    class EyeSlice {
+      constructor(options) {
+        this.id = options.id;
+        this.x = options.x;
+        this.y = options.y;
+        this.homeX = options.homeX || options.x;
+        this.homeY = options.homeY || options.y;
+        this.w = options.w;
+        this.h = options.h;
+
+        this.vx = options.vx || 0;
+        this.vy = options.vy || 0;
+        this.rotation = options.rotation || 0;
+        this.angularVelocity = options.angularVelocity || 0;
+        this.scale = options.scale || 1;
+        this.targetScale = 1;
+
+        this.isGrabbed = false;
+        this.grabOffsetX = 0;
+        this.grabOffsetY = 0;
+
+        this.sourceRect = options.sourceRect || null;
+        this.sourceEye = options.sourceEye || null;
+        this.alpha = 1;
+        this.flash = 0;
+        this.seed = Math.random() * 1000;
+      }
+
+      update(dt) {
+        if (!this.isGrabbed) {
+          const floatX = Math.sin(performance.now() * 0.001 + this.seed) * CONFIG.eyeSlices.floatNoiseAmount;
+          const floatY = Math.cos(performance.now() * 0.0012 + this.seed) * CONFIG.eyeSlices.floatNoiseAmount;
+          this.x += (this.vx + floatX) * dt * 60;
+          this.y += (this.vy + floatY) * dt * 60;
+          this.vx *= CONFIG.eyeSlices.friction;
+          this.vy *= CONFIG.eyeSlices.friction;
+          this.rotation += this.angularVelocity * dt * 60;
+          this.angularVelocity *= CONFIG.eyeSlices.friction;
+        }
+
+        this.scale += (this.targetScale - this.scale) * Math.min(1, dt * 12);
+        this.flash = Math.max(0, this.flash - dt * 3);
+        this.keepInBounds();
+      }
+
+      keepInBounds() {
+        const margin = Math.max(this.w, this.h) * this.scale * 0.6;
+        const minX = -margin;
+        const minY = -margin;
+        const maxX = AppState.canvasWidth + margin;
+        const maxY = AppState.canvasHeight + margin;
+
+        if (this.x < minX || this.x > maxX) {
+          this.vx *= -0.45;
+          this.x = Math.max(minX, Math.min(maxX, this.x));
+        }
+        if (this.y < minY || this.y > maxY) {
+          this.vy *= -0.45;
+          this.y = Math.max(minY, Math.min(maxY, this.y));
+        }
+      }
+
+      draw(targetCtx, sourceMedia) {
+        const drawW = this.w * this.scale;
+        const drawH = this.h * this.scale;
+
+        targetCtx.save();
+        targetCtx.translate(this.x, this.y);
+        targetCtx.rotate(this.rotation);
+        targetCtx.globalAlpha = this.alpha;
+        targetCtx.shadowColor = "rgba(0, 0, 0, 0.45)";
+        targetCtx.shadowBlur = 18;
+        targetCtx.shadowOffsetY = 10;
+
+        targetCtx.fillStyle = "rgba(0, 0, 0, 0.62)";
+        targetCtx.fillRect(-drawW / 2, -drawH / 2, drawW, drawH);
+
+        if (sourceMedia && this.sourceRect) {
+          const rect = this.sourceRect;
+          try {
+            targetCtx.drawImage(
+              sourceMedia,
+              rect.x,
+              rect.y,
+              rect.w,
+              rect.h,
+              -drawW / 2,
+              -drawH / 2,
+              drawW,
+              drawH
+            );
+          } catch (error) {
+            this.drawPlaceholder(targetCtx, drawW, drawH);
+          }
+        } else {
+          this.drawPlaceholder(targetCtx, drawW, drawH);
+        }
+
+        targetCtx.shadowColor = "transparent";
+        targetCtx.strokeStyle = "rgba(255, 255, 255, 0.88)";
+        targetCtx.lineWidth = this.isGrabbed ? 2 : 1.2;
+        targetCtx.strokeRect(-drawW / 2, -drawH / 2, drawW, drawH);
+
+        targetCtx.globalAlpha = 0.2;
+        targetCtx.fillStyle = "rgba(255, 255, 255, 0.8)";
+        for (let i = 0; i < 3; i += 1) {
+          const y = -drawH / 2 + ((performance.now() * 0.03 + i * 17 + this.seed) % drawH);
+          targetCtx.fillRect(-drawW / 2, y, drawW, 1);
+        }
+
+        if (this.flash > 0) {
+          targetCtx.globalAlpha = Math.min(0.85, this.flash);
+          targetCtx.fillStyle = "#fff";
+          targetCtx.fillRect(-drawW / 2, -drawH / 2, drawW, drawH);
+        }
+
+        targetCtx.restore();
+      }
+
+      drawPlaceholder(targetCtx, drawW, drawH) {
+        const gradient = targetCtx.createLinearGradient(-drawW / 2, 0, drawW / 2, 0);
+        gradient.addColorStop(0, "rgba(20, 24, 30, 0.92)");
+        gradient.addColorStop(0.5, "rgba(78, 92, 110, 0.86)");
+        gradient.addColorStop(1, "rgba(20, 24, 30, 0.92)");
+        targetCtx.fillStyle = gradient;
+        targetCtx.fillRect(-drawW / 2, -drawH / 2, drawW, drawH);
+
+        targetCtx.fillStyle = "rgba(255, 255, 255, 0.7)";
+        targetCtx.font = `${Math.max(10, Math.min(15, drawH * 0.22))}px sans-serif`;
+        targetCtx.textAlign = "center";
+        targetCtx.textBaseline = "middle";
+        targetCtx.fillText("EYE SLICE MOCK", 0, 0);
+      }
+
+      containsPoint(x, y) {
+        const cos = Math.cos(-this.rotation);
+        const sin = Math.sin(-this.rotation);
+        const dx = x - this.x;
+        const dy = y - this.y;
+        const localX = dx * cos - dy * sin;
+        const localY = dx * sin + dy * cos;
+        return Math.abs(localX) <= (this.w * this.scale) / 2 && Math.abs(localY) <= (this.h * this.scale) / 2;
+      }
+
+      grab(x, y) {
+        this.isGrabbed = true;
+        this.targetScale = 1.05;
+        this.grabOffsetX = this.x - x;
+        this.grabOffsetY = this.y - y;
+        this.vx = 0;
+        this.vy = 0;
+        this.angularVelocity *= 0.2;
+      }
+
+      drag(x, y) {
+        this.x = x + this.grabOffsetX;
+        this.y = y + this.grabOffsetY;
+      }
+
+      release(vx, vy) {
+        this.isGrabbed = false;
+        this.targetScale = 1;
+        const speed = Math.hypot(vx, vy);
+        const maxSpeed = CONFIG.eyeSlices.maxSpeed;
+        const scale = speed > maxSpeed ? maxSpeed / speed : 1;
+        this.vx = vx * scale * CONFIG.eyeSlices.throwMultiplier;
+        this.vy = vy * scale * CONFIG.eyeSlices.throwMultiplier;
+        this.angularVelocity = Math.max(-0.08, Math.min(0.08, vx * 0.004));
+      }
+    }
+
+    const EyeSliceManager = {
+      slices: [],
+      grabbedSlice: null,
+      pointerHistory: [],
+
+      init() {
+        this.createMockSlices();
+      },
+
+      createMockSlices() {
+        this.slices = [];
+        const sourceMedia = this.getSourceMedia();
+        const sourceSize = sourceMedia ? getMediaSize(sourceMedia) : null;
+        const fallbackRects = sourceSize
+          ? [
+              {
+                x: sourceSize.width * 0.34,
+                y: sourceSize.height * 0.35,
+                w: sourceSize.width * 0.16,
+                h: sourceSize.height * 0.12,
+                side: "left"
+              },
+              {
+                x: sourceSize.width * 0.5,
+                y: sourceSize.height * 0.35,
+                w: sourceSize.width * 0.16,
+                h: sourceSize.height * 0.12,
+                side: "right"
+              }
+            ]
+          : [];
+        const liveRects = FaceTracker.getEyeRects();
+
+        const count = CONFIG.eyeSlices.initialCount;
+        const baseW = Math.max(92, Math.min(180, AppState.canvasWidth * 0.12));
+        const baseH = Math.max(34, Math.min(72, AppState.canvasHeight * 0.08));
+
+        for (let i = 0; i < count; i += 1) {
+          const angle = (i / count) * Math.PI * 2;
+          const radiusX = AppState.canvasWidth * 0.19;
+          const radiusY = AppState.canvasHeight * 0.12;
+          const sourceEye = i % 2 === 0 ? "left" : "right";
+          const rect = liveRects.find((eyeRect) => eyeRect.side === sourceEye)
+            || fallbackRects.find((eyeRect) => eyeRect.side === sourceEye)
+            || null;
+          this.slices.push(new EyeSlice({
+            id: `mock-${i}`,
+            x: AppState.canvasWidth * 0.5 + Math.cos(angle) * radiusX,
+            y: AppState.canvasHeight * 0.48 + Math.sin(angle) * radiusY,
+            homeX: AppState.canvasWidth * 0.5 + Math.cos(angle) * radiusX,
+            homeY: AppState.canvasHeight * 0.48 + Math.sin(angle) * radiusY,
+            w: baseW * (0.82 + (i % 3) * 0.12),
+            h: baseH,
+            vx: Math.sin(angle) * 0.25,
+            vy: Math.cos(angle) * 0.22,
+            rotation: (i - count / 2) * 0.05,
+            angularVelocity: (i % 2 ? 0.006 : -0.006),
+            sourceEye,
+            sourceRect: rect
+          }));
+        }
+      },
+
+      createSliceFromEyeRect(eyeRect) {
+        const id = `eye-${Date.now()}-${this.slices.length}`;
+        const slice = new EyeSlice({
+          id,
+          x: AppState.canvasWidth * 0.5,
+          y: AppState.canvasHeight * 0.44,
+          w: Math.max(100, eyeRect.w * 1.6),
+          h: Math.max(36, eyeRect.h * 1.6),
+          sourceEye: eyeRect.side,
+          sourceRect: eyeRect
+        });
+        this.slices.push(slice);
+        return slice;
+      },
+
+      update(dt) {
+        if (!this.slices.length) {
+          this.createMockSlices();
+        }
+        this.slices.forEach((slice) => slice.update(dt));
+      },
+
+      draw(targetCtx) {
+        const sourceMedia = this.getSourceMedia();
+        this.slices.forEach((slice) => slice.draw(targetCtx, sourceMedia));
+      },
+
+      updateEyeRects(eyeRects) {
+        if (!eyeRects || !eyeRects.length) return;
+        this.slices.forEach((slice, index) => {
+          const sourceEye = slice.sourceEye || (index % 2 === 0 ? "left" : "right");
+          const rect = eyeRects.find((eyeRect) => eyeRect.side === sourceEye) || eyeRects[index % eyeRects.length];
+          if (rect) {
+            slice.sourceEye = sourceEye;
+            slice.sourceRect = rect;
+          }
+        });
+      },
+
+      getSourceMedia() {
+        if (AppState.cameraReady && SourceManager.videoEl) {
+          return SourceManager.videoEl;
+        }
+        return null;
+      },
+
+      findNearestSlice(x, y, radius) {
+        let best = null;
+        let bestDistance = radius;
+        for (let i = this.slices.length - 1; i >= 0; i -= 1) {
+          const slice = this.slices[i];
+          const distance = Math.hypot(slice.x - x, slice.y - y);
+          if ((slice.containsPoint(x, y) || distance < bestDistance) && distance <= bestDistance) {
+            best = slice;
+            bestDistance = distance;
+          }
+        }
+        return best;
+      },
+
+      grabAt(x, y) {
+        const slice = this.findNearestSlice(x, y, CONFIG.hand.grabRadius);
+        if (!slice) return false;
+        this.grabbedSlice = slice;
+        this.pointerHistory = [{ x, y, time: performance.now() }];
+        slice.grab(x, y);
+        return true;
+      },
+
+      dragTo(x, y) {
+        if (!this.grabbedSlice) return false;
+        this.grabbedSlice.drag(x, y);
+        this.recordPointer(x, y);
+        return true;
+      },
+
+      release(vx, vy) {
+        if (!this.grabbedSlice) return false;
+        this.grabbedSlice.release(vx, vy);
+        this.grabbedSlice = null;
+        this.pointerHistory = [];
+        return true;
+      },
+
+      recordPointer(x, y) {
+        const now = performance.now();
+        this.pointerHistory.push({ x, y, time: now });
+        this.pointerHistory = this.pointerHistory.filter((point) => now - point.time <= 140).slice(-6);
+      },
+
+      getReleaseVelocity() {
+        if (this.pointerHistory.length < 2) return { vx: 0, vy: 0 };
+        const first = this.pointerHistory[0];
+        const last = this.pointerHistory[this.pointerHistory.length - 1];
+        const dt = Math.max(16, last.time - first.time);
+        return {
+          vx: ((last.x - first.x) / dt) * 16.67,
+          vy: ((last.y - first.y) / dt) * 16.67
+        };
+      },
+
+      triggerBlinkEffect() {
+        this.slices.forEach((slice, index) => {
+          const target = this.getRegroupTarget(slice, index);
+          slice.flash = 1;
+          slice.homeX = target.x;
+          slice.homeY = target.y;
+          slice.vx += (target.x - slice.x) * 0.05 + Math.cos(index) * 1.2;
+          slice.vy += (target.y - slice.y) * 0.05 + Math.sin(index) * 1.2;
+          slice.rotation *= 0.65;
+          slice.angularVelocity += (index % 2 ? 0.018 : -0.018);
+          slice.targetScale = 0.94 + (index % 3) * 0.04;
+        });
+      },
+
+      getRegroupTarget(slice, index) {
+        if (slice.sourceRect) {
+          const mapped = mapVideoRectToCanvas(slice.sourceRect);
+          if (mapped) {
+            const localIndex = Math.floor(index / 2);
+            const offsetX = (localIndex - 1.5) * mapped.w * 0.42;
+            const offsetY = Math.sin(index * 1.7) * mapped.h * 0.28;
+            return {
+              x: mapped.x + mapped.w * 0.5 + offsetX,
+              y: mapped.y + mapped.h * 0.5 + offsetY
+            };
+          }
+        }
+
+        const count = Math.max(1, this.slices.length);
+        const angle = (index / count) * Math.PI * 2;
+        return {
+          x: AppState.canvasWidth * 0.5 + Math.cos(angle) * AppState.canvasWidth * 0.16,
+          y: AppState.canvasHeight * 0.46 + Math.sin(angle) * AppState.canvasHeight * 0.1
+        };
+      }
+    };
+
+    // =====================================================
+    // 7. PHYSICS ENGINE
+    // =====================================================
+    function updateFPS(timestamp) {
+      if (!AppState.lastFrameTime) {
+        AppState.lastFrameTime = timestamp;
+        return AppState.lastDeltaTime;
+      }
+
+      const delta = timestamp - AppState.lastFrameTime;
+      AppState.lastFrameTime = timestamp;
+      AppState.lastDeltaTime = Math.min(0.05, Math.max(0.001, delta / 1000));
+
+      if (delta > 0) {
+        const instantFPS = 1000 / delta;
+        AppState.fps = AppState.fps
+          ? AppState.fps * 0.9 + instantFPS * 0.1
+          : instantFPS;
+      }
+      return AppState.lastDeltaTime;
+    }
+
+    // =====================================================
+    // 8. RENDER ENGINE
+    // =====================================================
+    function getMediaSize(media) {
+      return {
+        width: media.videoWidth || media.naturalWidth || media.width || 1,
+        height: media.videoHeight || media.naturalHeight || media.height || 1
+      };
+    }
+
+    function drawMediaCover(targetCtx, media, mirrored) {
+      const mediaSize = getMediaSize(media);
+      const canvasRatio = AppState.canvasWidth / AppState.canvasHeight;
+      const mediaRatio = mediaSize.width / mediaSize.height;
+      let sx = 0;
+      let sy = 0;
+      let sw = mediaSize.width;
+      let sh = mediaSize.height;
+
+      if (mediaRatio > canvasRatio) {
+        sw = mediaSize.height * canvasRatio;
+        sx = (mediaSize.width - sw) * 0.5;
+      } else {
+        sh = mediaSize.width / canvasRatio;
+        sy = (mediaSize.height - sh) * 0.5;
+      }
+
+      targetCtx.save();
+      if (mirrored) {
+        targetCtx.translate(AppState.canvasWidth, 0);
+        targetCtx.scale(-1, 1);
+      }
+      targetCtx.drawImage(
+        media,
+        sx,
+        sy,
+        sw,
+        sh,
+        0,
+        0,
+        AppState.canvasWidth,
+        AppState.canvasHeight
+      );
+      targetCtx.restore();
+    }
+
+    function resizeCanvas() {
+      const width = window.innerWidth;
+      const height = window.innerHeight;
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+
+      AppState.canvasWidth = width;
+      AppState.canvasHeight = height;
+      AppState.dpr = dpr;
+
+      canvas.width = Math.floor(width * dpr);
+      canvas.height = Math.floor(height * dpr);
+      canvas.style.width = `${width}px`;
+      canvas.style.height = `${height}px`;
+
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+      if (EyeSliceManager && EyeSliceManager.slices.length) {
+        EyeSliceManager.createMockSlices();
+      }
+    }
+
+    function clearCanvas() {
+      ctx.clearRect(0, 0, AppState.canvasWidth, AppState.canvasHeight);
+      ctx.fillStyle = "#000";
+      ctx.fillRect(0, 0, AppState.canvasWidth, AppState.canvasHeight);
+    }
+
+    function render(timestamp, dt) {
+      clearCanvas();
+      const drewUploaded = SourceManager.drawUploadedMedia(ctx);
+      let drewCamera = false;
+
+      if (drewUploaded && AppState.cameraReady) {
+        ctx.save();
+        ctx.globalAlpha = 0.82;
+        drewCamera = SourceManager.drawCamera(ctx);
+        ctx.restore();
+      } else {
+        drewCamera = SourceManager.drawCamera(ctx);
+      }
+
+      AppState.lastRenderLayers = [];
+      if (drewUploaded) AppState.lastRenderLayers.push("uploaded");
+      if (drewCamera) AppState.lastRenderLayers.push("camera");
+
+      if (!drewUploaded && !drewCamera) {
+        drawStageZeroVisual(timestamp);
+        AppState.lastRenderLayers.push("fallback");
+      }
+      VisionEngine.update(timestamp);
+      EyeSliceManager.update(dt);
+      EyeSliceManager.draw(ctx);
+      AppState.lastRenderLayers.push("slices");
+      drawFaceDebug(ctx);
+      drawHandDebug(ctx);
+    }
+
+    function animationLoop(timestamp) {
+      AppState.frameCount += 1;
+      const dt = updateFPS(timestamp);
+      render(timestamp, dt);
+      updateDebugPanel();
+      requestAnimationFrame(animationLoop);
+    }
+
+    // =====================================================
+    // 9. UI EVENTS
+    // =====================================================
+    function getCanvasPoint(event) {
+      const rect = canvas.getBoundingClientRect();
+      return {
+        x: event.clientX - rect.left,
+        y: event.clientY - rect.top
+      };
+    }
+
+    function onPointerDown(event) {
+      if (startOverlay && !startOverlay.classList.contains("hidden")) return;
+      const point = getCanvasPoint(event);
+      const grabbed = EyeSliceManager.grabAt(point.x, point.y);
+      if (!grabbed) return;
+      AppState.pointerActive = true;
+      AppState.activePointerId = event.pointerId;
+      canvas.setPointerCapture(event.pointerId);
+      event.preventDefault();
+    }
+
+    function onPointerMove(event) {
+      if (!AppState.pointerActive || AppState.activePointerId !== event.pointerId) return;
+      const point = getCanvasPoint(event);
+      EyeSliceManager.dragTo(point.x, point.y);
+      event.preventDefault();
+    }
+
+    function onPointerUp(event) {
+      if (!AppState.pointerActive || AppState.activePointerId !== event.pointerId) return;
+      const velocity = EyeSliceManager.getReleaseVelocity();
+      EyeSliceManager.release(velocity.vx, velocity.vy);
+      AppState.pointerActive = false;
+      AppState.activePointerId = null;
+      if (canvas.hasPointerCapture(event.pointerId)) {
+        canvas.releasePointerCapture(event.pointerId);
+      }
+      event.preventDefault();
+    }
+
+    async function startExperience() {
+      startBtn.disabled = true;
+      startBtn.textContent = "正在启动...";
+      setPhase("loading");
+      startOverlay.classList.add("hidden");
+      startBtn.blur();
+      AppState.startedAt = performance.now();
+
+      await SourceManager.startCamera();
+      await VisionEngine.init({ hand: true, face: true });
+
+      setPhase("running");
+      showToast("捏合手指抓住眼睛切片，拖动甩开；眨眼触发重组。");
+      startBtn.textContent = "开始体验";
+      startBtn.disabled = false;
+    }
+
+    startBtn.addEventListener("click", async () => {
+      await startExperience();
+    });
+
+    toggleUiBtn.addEventListener("click", () => {
+      setUiHidden(!AppState.uiHidden);
+      toggleUiBtn.blur();
+    });
+
+    toggleDebugBtn.addEventListener("click", () => {
+      setDebugEnabled(!AppState.debug);
+      toggleDebugBtn.blur();
+    });
+
+    flipCameraBtn.addEventListener("click", async () => {
+      flipCameraBtn.disabled = true;
+      flipCameraBtn.textContent = "切换中...";
+      await SourceManager.switchCamera();
+      flipCameraBtn.textContent = "切换镜头";
+      flipCameraBtn.disabled = false;
+      flipCameraBtn.blur();
+    });
+
+    mediaUpload.addEventListener("change", async () => {
+      const file = mediaUpload.files && mediaUpload.files[0];
+      await SourceManager.handleUpload(file);
+      mediaUpload.value = "";
+    });
+
+    window.addEventListener("resize", resizeCanvas);
+    window.addEventListener("orientationchange", resizeCanvas);
+    canvas.addEventListener("pointerdown", onPointerDown);
+    canvas.addEventListener("pointermove", onPointerMove);
+    canvas.addEventListener("pointerup", onPointerUp);
+    canvas.addEventListener("pointercancel", onPointerUp);
+
+    // =====================================================
+    // 10. DEBUG PANEL
+    // =====================================================
+    function formatBool(value) {
+      return value ? "是" : "否";
+    }
+
+    function updateDebugPanel() {
+      if (!AppState.debug) {
+        debugPanel.hidden = true;
+        debugPanel.textContent = "";
+        return;
+      }
+      debugPanel.hidden = false;
+
+      const uptime = ((performance.now() - AppState.startedAt) / 1000).toFixed(1);
+      const latestError = AppState.errors.length
+        ? AppState.errors[AppState.errors.length - 1]
+        : "无";
+
+      debugPanel.textContent = [
+        "眸影碎境 阶段 5",
+        `阶段: ${AppState.phase}`,
+        `帧率: ${AppState.fps.toFixed(1)}`,
+        `画布: ${AppState.canvasWidth} x ${AppState.canvasHeight}`,
+        `DPR: ${AppState.dpr.toFixed(2)}`,
+        `界面隐藏: ${formatBool(AppState.uiHidden)}`,
+        `输入模式: ${AppState.inputMode}`,
+        `摄像头: ${formatBool(AppState.cameraReady)}`,
+        `镜像: ${formatBool(AppState.mirrored)}`,
+        `上传素材: ${formatBool(AppState.mediaReady)}`,
+        `渲染层: ${AppState.lastRenderLayers.join(" + ") || "无"}`,
+        `手势模型: ${formatBool(AppState.handReady)}`,
+        `检测手数: ${AppState.detectedHands}`,
+        `pinch 数: ${AppState.activePinches}`,
+        `最近手势: ${AppState.lastPinchEvent}`,
+        `脸部模型: ${formatBool(AppState.faceReady)}`,
+        `检测脸数: ${AppState.detectedFaces}`,
+        `眨眼状态: ${AppState.blinkState}`,
+        `睁眼比例: ${AppState.eyeOpenRatio.toFixed(3)}`,
+        `切片数量: ${EyeSliceManager.slices.length}`,
+        `正在抓取: ${formatBool(Boolean(EyeSliceManager.grabbedSlice))}`,
+        `运行: ${uptime}s`,
+        `最近错误: ${latestError}`
+      ].join("\n");
+    }
+
+    resizeCanvas();
+    EyeSliceManager.init();
+    setPhase("ready");
+    requestAnimationFrame(animationLoop);
+  </script>
+</body>
+</html>

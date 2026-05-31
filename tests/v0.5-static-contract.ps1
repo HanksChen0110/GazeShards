@@ -15,7 +15,7 @@ function Assert-Contains {
   }
 }
 
-Assert-Contains "V0\.5" "V0.5 stage marker should be present."
+Assert-Contains "V0\.[56]" "V0.5/V0.6 stage marker should be present."
 Assert-Contains "spiritArchive" "V0.5 spirit archive copy/state marker should be present."
 
 Assert-Contains "const\s+AudioManager\s*=" "AudioManager should manage the single looping BGM instance."

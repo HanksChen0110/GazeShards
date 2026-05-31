@@ -250,6 +250,7 @@
 
     body.recording-mode #controls,
     body.recording-mode #debugPanel,
+    body.recording-mode #triggerHintPanel,
     body.recording-mode #toast,
     body.recording-mode #guidePanel {
       display: none;
@@ -363,8 +364,68 @@
       overflow: auto;
     }
 
+    #debugCloseBtn {
+      position: sticky;
+      top: 0;
+      float: right;
+      width: 28px;
+      min-width: 28px;
+      min-height: 28px;
+      padding: 0;
+      margin-left: 8px;
+      border-radius: 999px;
+      line-height: 1;
+    }
+
+    #debugPanelText {
+      margin: 0;
+      white-space: pre-line;
+      font: inherit;
+    }
+
     body.ui-hidden #debugPanel {
       display: none;
+    }
+
+    #triggerHintPanel {
+      position: fixed;
+      left: max(18px, env(safe-area-inset-left));
+      top: max(18px, env(safe-area-inset-top));
+      z-index: 11;
+      width: min(260px, calc(100vw - 36px));
+      padding: 12px 12px 10px;
+      border: 1px solid rgba(159, 216, 255, 0.32);
+      border-radius: 4px;
+      background: rgba(3, 7, 12, 0.66);
+      box-shadow: inset 0 0 22px rgba(159, 216, 255, 0.07), 0 12px 34px rgba(0, 0, 0, 0.34);
+      backdrop-filter: blur(18px);
+      color: rgba(255, 255, 255, 0.82);
+      font-size: 12px;
+      line-height: 1.55;
+    }
+
+    #triggerHintPanel.hidden {
+      display: none;
+    }
+
+    #triggerHintPanel strong {
+      display: block;
+      margin-bottom: 6px;
+      color: rgba(229, 192, 111, 0.92);
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    #triggerHintCloseBtn {
+      position: absolute;
+      top: 6px;
+      right: 6px;
+      width: 24px;
+      min-width: 24px;
+      min-height: 24px;
+      padding: 0;
+      border-radius: 999px;
+      line-height: 1;
     }
 
     #guidePanel {
@@ -431,9 +492,15 @@
         right: 12px;
         top: 12px;
         width: auto;
-        max-height: calc(100dvh - 320px);
+        max-height: calc(100dvh - 360px);
         font-size: 11px;
         line-height: 1.42;
+      }
+
+      #triggerHintPanel {
+        left: 12px;
+        top: 12px;
+        width: min(220px, calc(100vw - 24px));
       }
 
       .controlButton,
@@ -459,6 +526,7 @@
   <div id="controls">
     <button id="soundToggleBtn" class="controlButton stageControl" type="button" aria-pressed="true" title="声音开关">♪</button>
     <button id="toggleUiBtn" class="controlButton" type="button">隐藏界面</button>
+    <button id="toggleHintBtn" class="controlButton stageControl" type="button">提示</button>
     <button id="toggleDebugBtn" class="controlButton stageControl" type="button">关闭调试</button>
     <button id="recordModeBtn" class="controlButton stageControl" type="button">录屏模式</button>
     <button id="resetVisualBtn" class="controlButton stageControl" type="button">重置画面</button>
@@ -471,7 +539,15 @@
     </label>
   </div>
 
-  <div id="debugPanel"></div>
+  <div id="triggerHintPanel">
+    <button id="triggerHintCloseBtn" class="controlButton" type="button" title="关闭提示">×</button>
+    <strong>灵视提示</strong>
+    <div id="triggerHintContent"></div>
+  </div>
+  <div id="debugPanel">
+    <button id="debugCloseBtn" class="controlButton" type="button" title="关闭调试">×</button>
+    <pre id="debugPanelText"></pre>
+  </div>
   <div id="guidePanel" class="hidden">捏住一块脸部碎片，拖入左侧卡牌背面。</div>
   <div id="toast" role="status" aria-live="polite"></div>
 
@@ -525,7 +601,16 @@
         switchCooldownMs: 900,
         summonDurationMs: 1800,
         revealDurationMs: 1150,
-        revealHoldMs: 800
+        revealHoldMs: 800,
+        normalCardWidthRatioDesktop: 0.18,
+        normalCardWidthRatioMobile: 0.28,
+        maxNormalCardWidth: 230
+      },
+
+      curtain: {
+        revealDistanceRatio: 0.18,
+        openDurationMs: 620,
+        reboundSpeed: 7.5
       },
 
       blinkCombo: {
@@ -557,6 +642,12 @@
 
       faceShards: {
         maxCount: 16,
+        maxVisibleDesktop: 7,
+        maxVisibleMobile: 5,
+        minInteractiveSizeDesktop: 56,
+        minInteractiveSizeMobile: 64,
+        returnForce: 0.16,
+        allowDecorativeShards: false,
         friction: 0.92,
         scatterForce: 10,
         grabRadius: 140,
@@ -574,6 +665,7 @@
     const controls = document.getElementById("controls");
     const soundToggleBtn = document.getElementById("soundToggleBtn");
     const toggleUiBtn = document.getElementById("toggleUiBtn");
+    const toggleHintBtn = document.getElementById("toggleHintBtn");
     const toggleDebugBtn = document.getElementById("toggleDebugBtn");
     const recordModeBtn = document.getElementById("recordModeBtn");
     const resetVisualBtn = document.getElementById("resetVisualBtn");
@@ -583,6 +675,11 @@
     const mediaUpload = document.getElementById("mediaUpload");
     const mediaUploadLabel = document.getElementById("mediaUploadLabel");
     const debugPanel = document.getElementById("debugPanel");
+    const debugCloseBtn = document.getElementById("debugCloseBtn");
+    const debugPanelText = document.getElementById("debugPanelText");
+    const triggerHintPanel = document.getElementById("triggerHintPanel");
+    const triggerHintCloseBtn = document.getElementById("triggerHintCloseBtn");
+    const triggerHintContent = document.getElementById("triggerHintContent");
     const guidePanel = document.getElementById("guidePanel");
     const recordExitBtn = document.getElementById("recordExitBtn");
     const restartBtn = document.getElementById("restartBtn");
@@ -593,6 +690,7 @@
     // =====================================================
     const AppState = {
       phase: "boot",
+      experiencePhase: "curtain", // curtain | shardRitual | revealed | foolEnding
       cameraReady: false,
       mediaReady: false,
       handReady: false,
@@ -644,7 +742,9 @@
       archiveVerdictBody: "",
       archiveReading: false,
       archiveGenerated: false,
-      spiritArchive: "V0.5",
+      spiritArchive: "V0.6",
+      lastCurtainEvent: "",
+      curtainHint: true,
       audioReady: false,
       audioEnabled: true,
       audioBlocked: false,
@@ -741,6 +841,219 @@
         soundToggleBtn.textContent = this.enabled ? "♪" : "×";
         soundToggleBtn.classList.toggle("is-active", this.enabled);
         soundToggleBtn.setAttribute("aria-pressed", String(this.enabled));
+      }
+    };
+
+    const TriggerHintPanel = {
+      visible: true,
+      collapsed: false,
+      items: [],
+      curtainHint: "拖开水膜：进入档案",
+
+      init() {
+        this.updateForPhase(AppState.experiencePhase);
+        this.setVisible(true);
+      },
+
+      toggle() {
+        this.setVisible(!this.visible);
+      },
+
+      setVisible(visible) {
+        this.visible = visible;
+        triggerHintPanel.classList.toggle("hidden", !visible || AppState.recordingMode);
+        toggleHintBtn.classList.toggle("is-active", visible);
+        toggleHintBtn.setAttribute("aria-pressed", String(visible));
+      },
+
+      updateForPhase(phase) {
+        const phaseLead = {
+          curtain: this.curtainHint,
+          shardRitual: "拖碎片入牌：生成身份",
+          revealed: "三次眨眼 / 三击卡牌：异常档案",
+          foolEnding: "异常档案已打开"
+        };
+        this.items = [
+          phaseLead[phase] || this.curtainHint,
+          "眨眼：重排碎片",
+          "挥掌：切换背面牌"
+        ];
+        triggerHintContent.innerHTML = this.items.map((item) => `<div>${item}</div>`).join("");
+      }
+    };
+
+    const DebugPanelController = {
+      visible: true,
+
+      show() {
+        this.visible = true;
+        setDebugEnabled(true);
+      },
+
+      hide() {
+        this.visible = false;
+        setDebugEnabled(false);
+      },
+
+      toggle() {
+        this.visible ? this.hide() : this.show();
+      }
+    };
+
+    const ControlDockController = {
+      ensureVisible() {
+        controls.style.maxHeight = "calc(100dvh - 28px)";
+        controls.style.overflow = "auto";
+      },
+
+      applySafeAreaLayout() {
+        this.ensureVisible();
+      }
+    };
+
+    const RippleManager = {
+      ripples: [],
+
+      emit(x, y, strength = 1, type = "curtain") {
+        const maxRipples = PerformanceManager?.effectiveMode === "low" ? 10 : 24;
+        this.ripples.push({
+          x,
+          y,
+          strength,
+          type,
+          life: type === "curtain" ? 1.15 : 0.72,
+          maxLife: type === "curtain" ? 1.15 : 0.72,
+          radius: 8
+        });
+        this.ripples = this.ripples.slice(-maxRipples);
+      },
+
+      update(dt) {
+        this.ripples.forEach((ripple) => {
+          ripple.life -= dt;
+          ripple.radius += dt * (ripple.type === "curtain" ? 86 : 138) * ripple.strength;
+        });
+        this.ripples = this.ripples.filter((ripple) => ripple.life > 0);
+      },
+
+      draw(targetCtx) {
+        targetCtx.save();
+        this.ripples.forEach((ripple) => {
+          const t = Math.max(0, ripple.life / ripple.maxLife);
+          const alpha = (ripple.type === "curtain" ? 0.46 : 0.24) * t;
+          targetCtx.strokeStyle = `rgba(159, 216, 255, ${alpha})`;
+          targetCtx.lineWidth = 1 + ripple.strength * 1.4;
+          targetCtx.beginPath();
+          targetCtx.arc(ripple.x, ripple.y, ripple.radius, 0, Math.PI * 2);
+          targetCtx.stroke();
+          targetCtx.fillStyle = `rgba(255, 255, 255, ${alpha * 0.16})`;
+          targetCtx.beginPath();
+          targetCtx.arc(ripple.x, ripple.y, ripple.radius * 0.28, 0, Math.PI * 2);
+          targetCtx.fill();
+        });
+        targetCtx.restore();
+      },
+
+      reset() {
+        this.ripples = [];
+      }
+    };
+
+    const CurtainRevealManager = {
+      state: "idle",
+      grabStart: null,
+      dragOffset: { x: 0, y: 0 },
+      revealProgress: 0,
+
+      update(timestamp, dt) {
+        if (AppState.experiencePhase !== "curtain") return;
+        if (this.state === "opening") {
+          this.revealProgress = Math.min(1, this.revealProgress + dt * 1.9);
+          if (this.revealProgress >= 1) {
+            this.state = "revealed";
+            AppState.lastCurtainEvent = "CURTAIN_REVEALED";
+            setExperiencePhase("shardRitual");
+          }
+        } else if (this.state === "idle") {
+          this.dragOffset.x *= Math.max(0, 1 - dt * CONFIG.curtain.reboundSpeed);
+          this.dragOffset.y *= Math.max(0, 1 - dt * CONFIG.curtain.reboundSpeed);
+          this.revealProgress = Math.max(0, Math.hypot(this.dragOffset.x, this.dragOffset.y) / this.threshold());
+        }
+      },
+
+      draw(targetCtx, timestamp) {
+        if (AppState.experiencePhase !== "curtain") return;
+        const width = AppState.canvasWidth;
+        const height = AppState.canvasHeight;
+        const openY = -height * 0.92 * this.revealProgress;
+        targetCtx.save();
+        targetCtx.translate(this.dragOffset.x * 0.28, this.dragOffset.y * 0.28 + openY);
+        const membrane = targetCtx.createLinearGradient(0, 0, width, height);
+        membrane.addColorStop(0, "rgba(255, 255, 255, 0.13)");
+        membrane.addColorStop(0.46, "rgba(159, 216, 255, 0.18)");
+        membrane.addColorStop(1, "rgba(229, 192, 111, 0.08)");
+        targetCtx.fillStyle = membrane;
+        targetCtx.fillRect(0, 0, width, height);
+        targetCtx.globalAlpha = 0.48;
+        targetCtx.strokeStyle = "rgba(255, 255, 255, 0.24)";
+        targetCtx.lineWidth = 1;
+        const wave = Math.sin(timestamp * 0.002) * 12;
+        for (let y = 36 + wave; y < height; y += 46) {
+          targetCtx.beginPath();
+          for (let x = 0; x <= width; x += 24) {
+            const py = y + Math.sin(x * 0.018 + timestamp * 0.003) * 5;
+            if (x === 0) targetCtx.moveTo(x, py);
+            else targetCtx.lineTo(x, py);
+          }
+          targetCtx.stroke();
+        }
+        targetCtx.globalAlpha = 1;
+        targetCtx.strokeStyle = "rgba(229, 192, 111, 0.68)";
+        targetCtx.lineWidth = 2;
+        targetCtx.strokeRect(26, 26, width - 52, height - 52);
+        targetCtx.fillStyle = "rgba(255,255,255,0.82)";
+        targetCtx.font = "16px Georgia, 'Microsoft YaHei', serif";
+        targetCtx.textAlign = "center";
+        targetCtx.fillText("拖开水膜，进入档案", width * 0.5, height * 0.52);
+        targetCtx.restore();
+      },
+
+      grabAt(x, y) {
+        if (AppState.experiencePhase !== "curtain") return false;
+        this.state = "grabbing";
+        this.grabStart = { x, y };
+        RippleManager.emit(x, y, 1.2, "curtain");
+        return true;
+      },
+
+      dragTo(x, y) {
+        if (this.state !== "grabbing" || !this.grabStart) return false;
+        this.dragOffset = { x: x - this.grabStart.x, y: y - this.grabStart.y };
+        this.revealProgress = Math.min(1, Math.hypot(this.dragOffset.x, this.dragOffset.y) / this.threshold());
+        RippleManager.emit(x, y, 1.1, "curtain");
+        return true;
+      },
+
+      release() {
+        if (this.state !== "grabbing") return false;
+        if (this.revealProgress >= 1) {
+          this.state = "opening";
+        } else {
+          this.state = "idle";
+          this.grabStart = null;
+        }
+        return true;
+      },
+
+      threshold() {
+        return Math.max(42, Math.min(AppState.canvasWidth, AppState.canvasHeight) * CONFIG.curtain.revealDistanceRatio);
+      },
+
+      reset() {
+        this.state = "idle";
+        this.grabStart = null;
+        this.dragOffset = { x: 0, y: 0 };
+        this.revealProgress = 0;
       }
     };
 
@@ -1291,7 +1604,7 @@
             this.lastBlinkTime = now;
             AppState.lastBlinkTime = now;
             EyeSliceManager.triggerBlinkEffect();
-            FaceShardManager.triggerReassemble();
+            FaceShardManager.reflowStableLayout("blink");
             MysticEffectManager.blink(now);
             TarotCardManager.registerBlink(now);
             return true;
@@ -1456,6 +1769,14 @@
       AppState.phase = nextPhase;
     }
 
+    function setExperiencePhase(nextPhase) {
+      AppState.experiencePhase = nextPhase;
+      if (nextPhase === "revealed") AppState.archiveGenerated = true;
+      if (nextPhase === "foolEnding") AppState.gameEnded = true;
+      TriggerHintPanel.updateForPhase(nextPhase);
+      TriggerHintPanel.setVisible(TriggerHintPanel.visible);
+    }
+
     function setUiHidden(hidden) {
       AppState.uiHidden = hidden;
       document.body.classList.toggle("ui-hidden", hidden);
@@ -1465,11 +1786,12 @@
 
     function setDebugEnabled(enabled) {
       AppState.debug = enabled;
+      DebugPanelController.visible = enabled;
       toggleDebugBtn.textContent = enabled ? "关闭调试" : "开启调试";
       toggleDebugBtn.setAttribute("aria-pressed", String(enabled));
       debugPanel.hidden = !enabled;
       if (!enabled) {
-        debugPanel.textContent = "";
+        debugPanelText.textContent = "";
       }
     }
 
@@ -1480,7 +1802,10 @@
       recordModeBtn.setAttribute("aria-pressed", String(enabled));
       if (enabled) {
         guidePanel.classList.add("hidden");
+        TriggerHintPanel.setVisible(false);
         toast.classList.remove("visible");
+      } else {
+        TriggerHintPanel.setVisible(TriggerHintPanel.visible);
       }
     }
 
@@ -1495,6 +1820,7 @@
 
     function resetVisualElements() {
       AppState.gameEnded = false;
+      setExperiencePhase("curtain");
       AppState.blinkComboCount = 0;
       AppState.screenFlash = 0;
       restartBtn.classList.remove("visible");
@@ -1502,6 +1828,8 @@
       FaceShardManager.reset();
       TarotCardManager.reset();
       CardRevealController.reset();
+      CurtainRevealManager.reset();
+      RippleManager.reset();
       ParticleManager.clear();
       MysticEffectManager.clear();
       showToast("视觉元素已重置。");
@@ -1527,6 +1855,11 @@
     function onPinchDown(x, y) {
       if (AppState.gameEnded) return false;
       AppState.lastPinchEvent = "PINCH_DOWN";
+      RippleManager.emit(x, y, 1, AppState.experiencePhase === "curtain" ? "curtain" : "shardRitual");
+      if (AppState.experiencePhase === "curtain") {
+        AppState.grabbedTarget = "curtain";
+        return CurtainRevealManager.grabAt(x, y);
+      }
       MysticEffectManager.pinchDown(x, y);
       if (FaceShardManager.grabAt(x, y)) {
         AppState.grabbedTarget = "face";
@@ -1542,6 +1875,10 @@
 
     function onPinchDrag(x, y) {
       AppState.lastPinchEvent = "PINCH_DRAG";
+      RippleManager.emit(x, y, 0.8, AppState.experiencePhase === "curtain" ? "curtain" : "shardRitual");
+      if (AppState.grabbedTarget === "curtain") {
+        return CurtainRevealManager.dragTo(x, y);
+      }
       MysticEffectManager.pinchDrag(x, y);
       if (AppState.grabbedTarget === "face") {
         return FaceShardManager.dragTo(x, y);
@@ -1551,6 +1888,11 @@
 
     function onPinchUp(vx, vy) {
       AppState.lastPinchEvent = "PINCH_UP";
+      if (AppState.grabbedTarget === "curtain") {
+        const releasedCurtain = CurtainRevealManager.release(vx, vy);
+        AppState.grabbedTarget = null;
+        return releasedCurtain;
+      }
       MysticEffectManager.pinchUp(vx, vy);
       let released = false;
       if (AppState.grabbedTarget === "face") {
@@ -1609,6 +1951,7 @@
 
     const OpenPalmDetector = {
       trigger(timestamp = performance.now()) {
+        if (AppState.experiencePhase !== "shardRitual") return false;
         if (timestamp - AppState.lastOpenPalmTime < CONFIG.tarotDeck.switchCooldownMs) return false;
         AppState.lastOpenPalmTime = timestamp;
         FaceShardManager.triggerScatter(0.45);
@@ -2033,6 +2376,7 @@
         AppState.cardState = this.cardState;
         AppState.currentCardId = this.foolCard.id;
         AppState.gameEnded = true;
+        setExperiencePhase("foolEnding");
         AppState.blinkComboCount = CONFIG.blinkCombo.requiredCount;
         this.summonStartedAt = timestamp;
         ArchiveVerdictManager.setResult(this.foolCard, AppState.selectedRegionType || "unknown");
@@ -2086,6 +2430,8 @@
           AppState.archiveGenerated = true;
           ArchiveVerdictManager.registerOrdinaryReveal(this.cards[AppState.currentCardIndex], AppState.selectedRegionType);
           FoolEasterEgg.enabled = true;
+          FoolEasterEgg.canUseFallback = true;
+          setExperiencePhase("revealed");
           CardRevealController.reset();
           showToast("身份档案已生成。");
         }
@@ -2103,8 +2449,8 @@
         const baseW = AppState.gameEnded
           ? Math.min(310, AppState.canvasWidth * 0.42, AppState.canvasHeight * 0.34)
           : mobile
-            ? Math.min(126, Math.max(96, AppState.canvasWidth * 0.32))
-            : Math.min(178, Math.max(108, AppState.canvasWidth * 0.13));
+            ? Math.min(CONFIG.tarotDeck.maxNormalCardWidth, Math.max(112, AppState.canvasWidth * CONFIG.tarotDeck.normalCardWidthRatioMobile))
+            : Math.min(CONFIG.tarotDeck.maxNormalCardWidth, Math.max(132, AppState.canvasWidth * CONFIG.tarotDeck.normalCardWidthRatioDesktop));
         const w = baseW;
         const h = w * cardRatio;
         const x = AppState.gameEnded
@@ -2371,6 +2717,9 @@
       enabled: false,
       blinkCount: 0,
       windowStartedAt: 0,
+      fallbackTapCount: 0,
+      fallbackWindowStartedAt: 0,
+      canUseFallback: false,
 
       registerBlink(timestamp = performance.now()) {
         if (!this.enabled || !AppState.hasRevealedArchive || TarotCardManager.cardState !== "revealed" || AppState.gameEnded) return false;
@@ -2388,10 +2737,31 @@
         return false;
       },
 
+      registerCardTap(timestamp = performance.now(), x = 0, y = 0) {
+        if (!this.enabled || !this.canUseFallback || !AppState.hasRevealedArchive || TarotCardManager.cardState !== "revealed" || AppState.gameEnded) return false;
+        const rect = TarotCardManager.getLayout().rect;
+        const hit = x >= rect.x && x <= rect.x + rect.w && y >= rect.y && y <= rect.y + rect.h;
+        if (!hit) return false;
+        if (!this.fallbackWindowStartedAt || timestamp - this.fallbackWindowStartedAt > 2000) {
+          this.fallbackWindowStartedAt = timestamp;
+          this.fallbackTapCount = 0;
+        }
+        this.fallbackTapCount += 1;
+        if (this.fallbackTapCount >= CONFIG.blinkCombo.requiredCount) {
+          this.enabled = false;
+          TarotCardManager.summonFool(timestamp);
+          return true;
+        }
+        return false;
+      },
+
       reset() {
         this.enabled = false;
         this.blinkCount = 0;
         this.windowStartedAt = 0;
+        this.fallbackTapCount = 0;
+        this.fallbackWindowStartedAt = 0;
+        this.canUseFallback = false;
         AppState.blinkComboCount = 0;
       }
     };
@@ -2776,6 +3146,41 @@
       }
     };
 
+    const ShardLabelRenderer = {
+      labels: {
+        eye: "眼",
+        mouth: "口",
+        forehead: "额",
+        cheek: "颊",
+        brow: "眉",
+        nose: "鼻",
+        jaw: "颌",
+        unknown: "未知"
+      },
+
+      getLabel(regionType) {
+        return this.labels[regionType] || this.labels.unknown;
+      },
+
+      draw(targetCtx, shard) {
+        const label = this.getLabel(shard.regionType);
+        const x = shard.x + shard.w * shard.scale * 0.32;
+        const y = shard.y - shard.h * shard.scale * 0.44;
+        targetCtx.save();
+        targetCtx.font = "12px 'Microsoft YaHei', sans-serif";
+        const labelW = Math.max(24, targetCtx.measureText(label).width + 12);
+        targetCtx.fillStyle = "rgba(3, 7, 12, 0.72)";
+        targetCtx.fillRect(x, y, labelW, 20);
+        targetCtx.strokeStyle = shard.isGrabbed ? "rgba(229, 192, 111, 0.92)" : "rgba(159, 216, 255, 0.52)";
+        targetCtx.strokeRect(x + 0.5, y + 0.5, labelW - 1, 19);
+        targetCtx.fillStyle = "rgba(255, 255, 255, 0.9)";
+        targetCtx.textAlign = "center";
+        targetCtx.textBaseline = "middle";
+        targetCtx.fillText(label, x + labelW * 0.5, y + 10);
+        targetCtx.restore();
+      }
+    };
+
     class FaceShard {
       constructor(options) {
         this.id = options.id;
@@ -2796,20 +3201,28 @@
         this.isGrabbed = false;
         this.grabOffsetX = 0;
         this.grabOffsetY = 0;
+        this.regionType = options.regionType || "unknown";
+        this.interactive = options.interactive !== false;
+        this.canTriggerCard = true;
         this.seed = Math.random() * 1000;
       }
 
       update(dt) {
         if (FaceShardManager.frozen && !this.isGrabbed) return;
         if (!this.isGrabbed) {
-          this.vx += (this.homeX - this.x) * CONFIG.faceShards.reassembleForce * dt;
-          this.vy += (this.homeY - this.y) * CONFIG.faceShards.reassembleForce * dt;
+          this.vx += (this.homeX - this.x) * CONFIG.faceShards.returnForce * dt;
+          this.vy += (this.homeY - this.y) * CONFIG.faceShards.returnForce * dt;
           this.x += this.vx * dt * 60;
           this.y += this.vy * dt * 60;
-          this.vx *= CONFIG.faceShards.friction;
-          this.vy *= CONFIG.faceShards.friction;
-          this.rotation += this.angularVelocity * dt * 60;
-          this.angularVelocity *= CONFIG.faceShards.friction;
+          this.vx *= 0.78;
+          this.vy *= 0.78;
+          this.angularVelocity = 0;
+          if (Math.hypot(this.homeX - this.x, this.homeY - this.y) < 1.5) {
+            this.x = this.homeX;
+            this.y = this.homeY;
+            this.vx = 0;
+            this.vy = 0;
+          }
         }
         this.scale += (this.targetScale - this.scale) * Math.min(1, dt * 10);
       }
@@ -2851,6 +3264,7 @@
         targetCtx.lineWidth = this.isGrabbed ? 2 : 1;
         targetCtx.strokeRect(-drawW / 2, -drawH / 2, drawW, drawH);
         targetCtx.restore();
+        ShardLabelRenderer.draw(targetCtx, this);
       }
 
       drawFallback(targetCtx, drawW, drawH) {
@@ -2881,9 +3295,9 @@
       release(vx, vy) {
         this.isGrabbed = false;
         this.targetScale = 1;
-        this.vx = Math.max(-32, Math.min(32, vx));
-        this.vy = Math.max(-32, Math.min(32, vy));
-        this.angularVelocity = Math.max(-0.07, Math.min(0.07, vx * 0.003));
+        this.vx = 0;
+        this.vy = 0;
+        this.angularVelocity = 0;
       }
     }
 
@@ -2956,7 +3370,7 @@
           { x: 0.42, y: 0.86, w: 0.26, h: 0.16, scale: 0.64, regionType: "jaw" },
           { x: 0.58, y: 0.30, w: 0.20, h: 0.18, scale: 0.76, regionType: "brow" },
           { x: 0.34, y: 0.34, w: 0.20, h: 0.18, scale: 0.84, regionType: "brow" }
-        ].slice(0, CONFIG.faceShards.maxCount);
+        ].slice(0, this.getMaxVisibleCount());
 
         return regions.map((region, index) => {
           const sourceW = Math.max(6, faceRect.w * region.w);
@@ -2984,7 +3398,9 @@
             y: homeY + Math.cos(index * 1.3) * 18,
             w: side * Math.sqrt(aspect),
             h: side / Math.sqrt(aspect),
-            regionType: region.regionType || "unknown"
+            regionType: region.regionType || "unknown",
+            interactive: true,
+            canTriggerCard: true
           };
         });
       },
@@ -2999,29 +3415,53 @@
 
       createMockShards() {
         const regionTypes = ["eye", "mouth", "forehead", "cheek", "brow", "nose", "jaw"];
-        const count = Math.min(7, CONFIG.faceShards.maxCount);
+        const count = this.getMaxVisibleCount();
         this.shards = Array.from({ length: count }, (_, index) => {
           const angle = (index / count) * Math.PI * 2;
-          const x = AppState.canvasWidth * 0.5 + Math.cos(angle) * AppState.canvasWidth * 0.17;
-          const y = AppState.canvasHeight * 0.48 + Math.sin(angle) * AppState.canvasHeight * 0.11;
-          const side = Math.max(48, Math.min(92, AppState.canvasWidth * 0.13));
+          const x = AppState.canvasWidth * 0.56 + Math.cos(angle) * AppState.canvasWidth * 0.16;
+          const y = AppState.canvasHeight * 0.48 + Math.sin(angle) * AppState.canvasHeight * 0.10;
+          const minSize = AppState.canvasWidth < 600 ? CONFIG.faceShards.minInteractiveSizeMobile : CONFIG.faceShards.minInteractiveSizeDesktop;
+          const side = Math.max(minSize, Math.min(96, AppState.canvasWidth * 0.12));
           return new FaceShard({
             id: `archive-mock-${index}`,
             sourceRect: null,
             regionType: regionTypes[index % regionTypes.length],
+            interactive: true,
+            canTriggerCard: true,
             x,
             y,
             homeX: x,
             homeY: y,
             w: side * (index % 2 ? 1.15 : 0.92),
             h: side,
-            vx: Math.cos(angle) * 0.28,
-            vy: Math.sin(angle) * 0.22,
+            vx: 0,
+            vy: 0,
             rotation: (index - 3) * 0.04,
-            angularVelocity: index % 2 ? 0.004 : -0.004
+            angularVelocity: 0
           });
         });
         AppState.faceShardCount = this.shards.length;
+      },
+
+      getMaxVisibleCount() {
+        return AppState.canvasWidth < 600
+          ? CONFIG.faceShards.maxVisibleMobile
+          : CONFIG.faceShards.maxVisibleDesktop;
+      },
+
+      reflowStableLayout(reason = "blink") {
+        const count = this.shards.length;
+        if (!count) return;
+        this.shards.forEach((shard, index) => {
+          const angle = ((index + (reason === "blink" ? 1 : 0.35)) / count) * Math.PI * 2;
+          shard.homeX = AppState.canvasWidth * 0.55 + Math.cos(angle) * AppState.canvasWidth * 0.16;
+          shard.homeY = AppState.canvasHeight * 0.48 + Math.sin(angle) * AppState.canvasHeight * 0.10;
+          shard.vx = (shard.homeX - shard.x) * 0.018;
+          shard.vy = (shard.homeY - shard.y) * 0.018;
+          shard.angularVelocity = 0;
+          shard.targetScale = 1;
+        });
+        ParticleManager.emit(AppState.canvasWidth * 0.5, AppState.canvasHeight * 0.45, 8, "blink");
       },
 
       draw(targetCtx) {
@@ -3600,6 +4040,9 @@
       if (typeof FaceShardManager !== "undefined") {
         FaceShardManager.reset();
       }
+      if (typeof ControlDockController !== "undefined") {
+        ControlDockController.applySafeAreaLayout();
+      }
     }
 
     function clearCanvas() {
@@ -3670,23 +4113,37 @@
         AppState.lastRenderLayers.push("fallback");
       }
       VisionEngine.update(timestamp);
-      FaceShardManager.update(dt);
+      RippleManager.update(dt);
+      CurtainRevealManager.update(timestamp, dt);
+      if (AppState.experiencePhase !== "curtain") {
+        FaceShardManager.update(dt);
+      }
       EyeSliceManager.update(dt);
       ParticleManager.update(dt);
       MysticEffectManager.update(dt);
-      CardRevealController.update(timestamp);
+      if (AppState.experiencePhase !== "curtain") {
+        CardRevealController.update(timestamp);
+      }
       TarotCardManager.update(timestamp);
-      FaceShardManager.draw(ctx);
-      AppState.lastRenderLayers.push("face-shards");
-      EyeSliceManager.draw(ctx);
-      AppState.lastRenderLayers.push("slices");
+      if (AppState.experiencePhase !== "curtain") {
+        FaceShardManager.draw(ctx);
+        AppState.lastRenderLayers.push("face-shards");
+        EyeSliceManager.draw(ctx);
+        AppState.lastRenderLayers.push("slices");
+      }
       ParticleManager.draw(ctx);
       MysticEffectManager.draw(ctx);
       drawVisualAtmosphere(ctx, timestamp);
       drawMysticFrame(ctx, timestamp);
-      TarotCardManager.draw(ctx, timestamp);
-      ArchiveVerdictManager.draw(ctx, timestamp);
-      AppState.lastRenderLayers.push("tarot");
+      if (AppState.experiencePhase === "curtain") {
+        CurtainRevealManager.draw(ctx, timestamp);
+        AppState.lastRenderLayers.push("curtain");
+      } else {
+        TarotCardManager.draw(ctx, timestamp);
+        ArchiveVerdictManager.draw(ctx, timestamp);
+        AppState.lastRenderLayers.push("tarot");
+      }
+      RippleManager.draw(ctx);
       TopEyePreview.draw(ctx);
       AppState.lastRenderLayers.push("top-eye");
       drawFaceDebug(ctx);
@@ -3715,7 +4172,13 @@
     function onPointerDown(event) {
       if (startOverlay && !startOverlay.classList.contains("hidden")) return;
       const point = getCanvasPoint(event);
-      const grabbed = onPinchDown(point.x, point.y);
+      if (FoolEasterEgg.registerCardTap(performance.now(), point.x, point.y)) {
+        event.preventDefault();
+        return;
+      }
+      const grabbed = AppState.experiencePhase === "curtain"
+        ? CurtainRevealManager.grabAt(point.x, point.y)
+        : onPinchDown(point.x, point.y);
       if (!grabbed) return;
       AppState.pointerActive = true;
       AppState.activePointerId = event.pointerId;
@@ -3724,19 +4187,28 @@
     }
 
     function onPointerMove(event) {
-      if (!AppState.pointerActive || AppState.activePointerId !== event.pointerId) return;
       const point = getCanvasPoint(event);
-      onPinchDrag(point.x, point.y);
+      RippleManager.emit(point.x, point.y, 0.6, AppState.experiencePhase === "curtain" ? "curtain" : "shardRitual");
+      if (!AppState.pointerActive || AppState.activePointerId !== event.pointerId) return;
+      if (AppState.experiencePhase === "curtain") {
+        CurtainRevealManager.dragTo(point.x, point.y);
+      } else {
+        onPinchDrag(point.x, point.y);
+      }
       event.preventDefault();
     }
 
     function onPointerUp(event) {
       if (!AppState.pointerActive || AppState.activePointerId !== event.pointerId) return;
-      let velocity = EyeSliceManager.getReleaseVelocity();
-      if (AppState.grabbedTarget === "face") {
-        velocity = FaceShardManager.getReleaseVelocity();
+      if (AppState.experiencePhase === "curtain") {
+        CurtainRevealManager.release();
+      } else {
+        let velocity = EyeSliceManager.getReleaseVelocity();
+        if (AppState.grabbedTarget === "face") {
+          velocity = FaceShardManager.getReleaseVelocity();
+        }
+        onPinchUp(velocity.vx, velocity.vy);
       }
-      onPinchUp(velocity.vx, velocity.vy);
       AppState.pointerActive = false;
       AppState.activePointerId = null;
       if (canvas.hasPointerCapture(event.pointerId)) {
@@ -3768,8 +4240,11 @@
       });
 
       setPhase("running");
+      setExperiencePhase("curtain");
+      CurtainRevealManager.reset();
+      RippleManager.reset();
       showGuide();
-      showToast("捏住一块脸部碎片，拖入左侧卡牌背面。");
+      showToast("拖开水膜：进入档案。");
       startBtn.textContent = "开启灵视";
       startBtn.disabled = false;
     }
@@ -3789,9 +4264,24 @@
       toggleUiBtn.blur();
     });
 
+    toggleHintBtn.addEventListener("click", () => {
+      TriggerHintPanel.toggle();
+      toggleHintBtn.blur();
+    });
+
+    triggerHintCloseBtn.addEventListener("click", () => {
+      TriggerHintPanel.setVisible(false);
+      triggerHintCloseBtn.blur();
+    });
+
     toggleDebugBtn.addEventListener("click", () => {
       setDebugEnabled(!AppState.debug);
       toggleDebugBtn.blur();
+    });
+
+    debugCloseBtn.addEventListener("click", () => {
+      DebugPanelController.hide();
+      debugCloseBtn.blur();
     });
 
     recordModeBtn.addEventListener("click", () => {
@@ -3850,8 +4340,12 @@
         setDebugEnabled(!AppState.debug);
       } else if (key === "r") {
         resetVisualElements();
-      } else if (key === "escape" && AppState.recordingMode) {
-        setRecordingMode(false);
+      } else if (key === "escape") {
+        if (AppState.recordingMode) {
+          setRecordingMode(false);
+        } else if (AppState.debug) {
+          DebugPanelController.hide();
+        }
       }
     });
     canvas.addEventListener("pointerdown", onPointerDown);
@@ -3869,7 +4363,7 @@
     function updateDebugPanel() {
       if (!AppState.debug) {
         debugPanel.hidden = true;
-        debugPanel.textContent = "";
+        debugPanelText.textContent = "";
         return;
       }
       debugPanel.hidden = false;
@@ -3879,9 +4373,11 @@
         ? AppState.errors[AppState.errors.length - 1]
         : "无";
 
-      debugPanel.textContent = [
-        "灵视档案馆 V0.5",
+      debugPanelText.textContent = [
+        "灵视档案馆 V0.6",
         `阶段: ${AppState.phase}`,
+        `体验阶段: ${AppState.experiencePhase}`,
+        `幕布事件: ${AppState.lastCurtainEvent || "无"}`,
         `帧率: ${AppState.fps.toFixed(1)}`,
         `画布: ${AppState.canvasWidth} x ${AppState.canvasHeight}`,
         `DPR: ${AppState.dpr.toFixed(2)}`,
@@ -3927,6 +4423,8 @@
     resizeCanvas();
     EyeSliceManager.init();
     AudioManager.init();
+    TriggerHintPanel.init();
+    ControlDockController.applySafeAreaLayout();
     CameraStylePipeline.setGrayscale(CONFIG.visualStyle.grayscaleEnabled);
     TarotCardManager.reset();
     TarotCardManager.preloadTarotAssets();

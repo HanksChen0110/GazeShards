@@ -517,7 +517,7 @@
 
   <div id="startOverlay">
     <div class="startPanel">
-      <h1>灵视档案馆</h1>
+      <h1>诡秘之镜</h1>
       <p>交出一块脸部碎片，打开你的隐藏档案。</p>
       <button id="startBtn" class="primaryButton" type="button">开启灵视</button>
     </div>
@@ -750,6 +750,8 @@
       audioBlocked: false,
       lastOpenPalmTime: 0,
       blinkComboCount: 0,
+      shardReflowBlinkCount: 0,
+      shardReflowWindowStartedAt: 0,
       gameEnded: false,
       screenFlash: 0,
 
@@ -870,14 +872,17 @@
         const phaseLead = {
           curtain: this.curtainHint,
           shardRitual: "拖碎片入牌：生成身份",
-          revealed: "三次眨眼 / 三击卡牌：异常档案",
+          revealed: "神秘彩蛋：三次眨眼 / 三击卡牌",
           foolEnding: "异常档案已打开"
         };
-        this.items = [
+        this.items = Array.from(new Set([
           phaseLead[phase] || this.curtainHint,
-          "眨眼：重排碎片",
-          "挥掌：切换背面牌"
-        ];
+          "拖碎片入牌：生成身份",
+          "三次眨眼：重排碎片",
+          "挥掌：切换背面牌",
+          "挥手：展开牌返回背面",
+          "神秘彩蛋：三次眨眼 / 三击卡牌"
+        ]));
         triggerHintContent.innerHTML = this.items.map((item) => `<div>${item}</div>`).join("");
       }
     };
@@ -1584,6 +1589,30 @@
       }
     };
 
+    const ShardBlinkReflowController = {
+      registerBlink(timestamp = performance.now()) {
+        if (!AppState.shardReflowWindowStartedAt || timestamp - AppState.shardReflowWindowStartedAt > CONFIG.blinkCombo.windowMs) {
+          AppState.shardReflowWindowStartedAt = timestamp;
+          AppState.shardReflowBlinkCount = 0;
+        }
+
+        AppState.shardReflowBlinkCount += 1;
+        if (AppState.shardReflowBlinkCount >= CONFIG.blinkCombo.requiredCount) {
+          AppState.shardReflowBlinkCount = 0;
+          AppState.shardReflowWindowStartedAt = 0;
+          FaceShardManager.reflowStableLayout("tripleBlink");
+          return true;
+        }
+
+        return false;
+      },
+
+      reset() {
+        AppState.shardReflowBlinkCount = 0;
+        AppState.shardReflowWindowStartedAt = 0;
+      }
+    };
+
     const BlinkDetector = {
       lastBlinkTime: 0,
       wasClosed: false,
@@ -1604,7 +1633,7 @@
             this.lastBlinkTime = now;
             AppState.lastBlinkTime = now;
             EyeSliceManager.triggerBlinkEffect();
-            FaceShardManager.reflowStableLayout("blink");
+            ShardBlinkReflowController.registerBlink(now);
             MysticEffectManager.blink(now);
             TarotCardManager.registerBlink(now);
             return true;
@@ -1822,11 +1851,14 @@
       AppState.gameEnded = false;
       setExperiencePhase("curtain");
       AppState.blinkComboCount = 0;
+      AppState.shardReflowBlinkCount = 0;
+      AppState.shardReflowWindowStartedAt = 0;
       AppState.screenFlash = 0;
       restartBtn.classList.remove("visible");
       EyeSliceManager.createMockSlices();
       FaceShardManager.reset();
       TarotCardManager.reset();
+      ShardBlinkReflowController.reset();
       CardRevealController.reset();
       CurtainRevealManager.reset();
       RippleManager.reset();
@@ -1951,8 +1983,14 @@
 
     const OpenPalmDetector = {
       trigger(timestamp = performance.now()) {
-        if (AppState.experiencePhase !== "shardRitual") return false;
         if (timestamp - AppState.lastOpenPalmTime < CONFIG.tarotDeck.switchCooldownMs) return false;
+        if (TarotCardManager.returnRevealedCardToBack(timestamp)) {
+          AppState.lastOpenPalmTime = timestamp;
+          MysticEffectManager.openPalm(timestamp);
+          return true;
+        }
+
+        if (AppState.experiencePhase !== "shardRitual") return false;
         AppState.lastOpenPalmTime = timestamp;
         FaceShardManager.triggerScatter(0.45);
         MysticEffectManager.openPalm(timestamp);
@@ -2367,6 +2405,27 @@
         showToast(`待揭示牌：${this.cards[AppState.currentCardIndex].zh}`);
       },
 
+      returnRevealedCardToBack(timestamp = performance.now()) {
+        if (AppState.gameEnded || this.cardState !== "revealed") return false;
+        this.cardState = "faceDown";
+        this.revealStartedAt = 0;
+        AppState.cardState = this.cardState;
+        AppState.hasRevealedArchive = false;
+        AppState.archiveGenerated = false;
+        AppState.archiveReading = false;
+        RitualState.selectedShardId = null;
+        RitualState.hoverStartAt = 0;
+        RitualState.revealStartedAt = 0;
+        setExperiencePhase("shardRitual");
+        CardRevealController.reset();
+        ArchiveVerdictManager.reset();
+        FoolEasterEgg.reset();
+        ShardBlinkReflowController.reset();
+        FaceShardManager.reflowStableLayout("waveBack");
+        showToast("普通展开牌已返回背面。");
+        return true;
+      },
+
       registerBlink(timestamp = performance.now()) {
         return FoolEasterEgg.registerBlink(timestamp);
       },
@@ -2642,7 +2701,7 @@
       },
 
       setResult(card, regionType = "unknown") {
-        AppState.archiveVerdictTitle = `你的灵视档案：${card.zh}`;
+        AppState.archiveVerdictTitle = `你的诡秘之镜档案：${card.zh}`;
         AppState.archiveVerdictBody = this.verdicts[card.id] || "";
         AppState.selectedRegionType = regionType;
       },
@@ -3340,12 +3399,42 @@
         this.shards = this.buildLayout(faceRect).map((item, index) => new FaceShard({
           id: `face-${index}`,
           ...item,
-          vx: (Math.random() - 0.5) * 1.2,
-          vy: (Math.random() - 0.5) * 1.2,
-          rotation: (index - 5) * 0.025,
-          angularVelocity: index % 2 ? 0.005 : -0.005
+          vx: 0,
+          vy: 0,
+          rotation: item.rotation || 0,
+          angularVelocity: 0
         }));
         AppState.faceShardCount = this.shards.length;
+      },
+
+      buildRegularShardLayout(mapped, count) {
+        const minSide = AppState.canvasWidth < 600
+          ? CONFIG.faceShards.minInteractiveSizeMobile
+          : CONFIG.faceShards.minInteractiveSizeDesktop;
+        const baseSide = Math.max(minSide, Math.min(154, Math.min(mapped.w, mapped.h) * 0.22));
+        const centerX = mapped.x + mapped.w * 0.58;
+        const centerY = mapped.y + mapped.h * 0.48;
+        const pattern = [
+          { dx: -0.04, dy: -0.34, scale: 0.78, aspect: 1.38, rotation: 0 },
+          { dx: 0.10, dy: -0.22, scale: 0.92, aspect: 1.02, rotation: 0 },
+          { dx: -0.02, dy: -0.04, scale: 1.24, aspect: 1.08, rotation: 0 },
+          { dx: -0.15, dy: 0.15, scale: 0.92, aspect: 0.92, rotation: 0 },
+          { dx: 0.15, dy: 0.18, scale: 1.14, aspect: 1.18, rotation: 0 },
+          { dx: -0.02, dy: 0.43, scale: 0.82, aspect: 0.86, rotation: 0 },
+          { dx: 0.19, dy: 0.52, scale: 0.62, aspect: 0.96, rotation: 0 },
+          { dx: -0.19, dy: 0.36, scale: 0.58, aspect: 0.92, rotation: 0 }
+        ];
+
+        return pattern.slice(0, count).map((item) => {
+          const side = baseSide * item.scale;
+          return {
+            homeX: centerX + mapped.w * item.dx,
+            homeY: centerY + mapped.h * item.dy,
+            w: side * Math.sqrt(item.aspect),
+            h: side / Math.sqrt(item.aspect),
+            rotation: item.rotation
+          };
+        });
       },
 
       buildLayout(faceRect) {
@@ -3371,8 +3460,10 @@
           { x: 0.58, y: 0.30, w: 0.20, h: 0.18, scale: 0.76, regionType: "brow" },
           { x: 0.34, y: 0.34, w: 0.20, h: 0.18, scale: 0.84, regionType: "brow" }
         ].slice(0, this.getMaxVisibleCount());
+        const regularLayout = this.buildRegularShardLayout(mapped, regions.length);
 
         return regions.map((region, index) => {
+          const regular = regularLayout[index] || regularLayout[0];
           const sourceW = Math.max(6, faceRect.w * region.w);
           const sourceH = Math.max(6, faceRect.h * region.h);
           const centerX = faceRect.x + faceRect.w * region.x;
@@ -3386,18 +3477,15 @@
             h: sourceH,
             side: `face-${index}`
           };
-          const homeX = mapped.x + mapped.w * region.x + Math.sin(index) * 10;
-          const homeY = mapped.y + mapped.h * region.y + Math.cos(index * 1.4) * 8;
-          const side = Math.max(34, Math.min(138, Math.min(mapped.w, mapped.h) * 0.20 * region.scale));
-          const aspect = Math.max(0.72, Math.min(1.55, region.w / region.h));
           return {
             sourceRect,
-            homeX,
-            homeY,
-            x: homeX + Math.sin(index * 1.8) * 26,
-            y: homeY + Math.cos(index * 1.3) * 18,
-            w: side * Math.sqrt(aspect),
-            h: side / Math.sqrt(aspect),
+            homeX: regular.homeX,
+            homeY: regular.homeY,
+            x: regular.homeX,
+            y: regular.homeY,
+            w: regular.w,
+            h: regular.h,
+            rotation: regular.rotation,
             regionType: region.regionType || "unknown",
             interactive: true,
             canTriggerCard: true
@@ -3416,27 +3504,30 @@
       createMockShards() {
         const regionTypes = ["eye", "mouth", "forehead", "cheek", "brow", "nose", "jaw"];
         const count = this.getMaxVisibleCount();
+        const mockFace = {
+          x: AppState.canvasWidth * 0.38,
+          y: AppState.canvasHeight * 0.22,
+          w: AppState.canvasWidth * 0.32,
+          h: AppState.canvasHeight * 0.56
+        };
+        const regularLayout = this.buildRegularShardLayout(mockFace, count);
         this.shards = Array.from({ length: count }, (_, index) => {
-          const angle = (index / count) * Math.PI * 2;
-          const x = AppState.canvasWidth * 0.56 + Math.cos(angle) * AppState.canvasWidth * 0.16;
-          const y = AppState.canvasHeight * 0.48 + Math.sin(angle) * AppState.canvasHeight * 0.10;
-          const minSize = AppState.canvasWidth < 600 ? CONFIG.faceShards.minInteractiveSizeMobile : CONFIG.faceShards.minInteractiveSizeDesktop;
-          const side = Math.max(minSize, Math.min(96, AppState.canvasWidth * 0.12));
+          const regular = regularLayout[index] || regularLayout[0];
           return new FaceShard({
             id: `archive-mock-${index}`,
             sourceRect: null,
             regionType: regionTypes[index % regionTypes.length],
             interactive: true,
             canTriggerCard: true,
-            x,
-            y,
-            homeX: x,
-            homeY: y,
-            w: side * (index % 2 ? 1.15 : 0.92),
-            h: side,
+            x: regular.homeX,
+            y: regular.homeY,
+            homeX: regular.homeX,
+            homeY: regular.homeY,
+            w: regular.w,
+            h: regular.h,
             vx: 0,
             vy: 0,
-            rotation: (index - 3) * 0.04,
+            rotation: regular.rotation,
             angularVelocity: 0
           });
         });
@@ -3452,16 +3543,46 @@
       reflowStableLayout(reason = "blink") {
         const count = this.shards.length;
         if (!count) return;
+        const bounds = this.getShardLayoutBounds();
+        const regularLayout = this.buildRegularShardLayout(bounds, count);
         this.shards.forEach((shard, index) => {
-          const angle = ((index + (reason === "blink" ? 1 : 0.35)) / count) * Math.PI * 2;
-          shard.homeX = AppState.canvasWidth * 0.55 + Math.cos(angle) * AppState.canvasWidth * 0.16;
-          shard.homeY = AppState.canvasHeight * 0.48 + Math.sin(angle) * AppState.canvasHeight * 0.10;
+          const regular = regularLayout[index] || regularLayout[0];
+          shard.homeX = regular.homeX;
+          shard.homeY = regular.homeY;
+          shard.w = regular.w;
+          shard.h = regular.h;
+          shard.rotation = regular.rotation;
           shard.vx = (shard.homeX - shard.x) * 0.018;
           shard.vy = (shard.homeY - shard.y) * 0.018;
           shard.angularVelocity = 0;
           shard.targetScale = 1;
         });
         ParticleManager.emit(AppState.canvasWidth * 0.5, AppState.canvasHeight * 0.45, 8, "blink");
+      },
+
+      getShardLayoutBounds() {
+        const active = this.shards.length ? this.shards : [];
+        if (!active.length) {
+          return {
+            x: AppState.canvasWidth * 0.38,
+            y: AppState.canvasHeight * 0.22,
+            w: AppState.canvasWidth * 0.32,
+            h: AppState.canvasHeight * 0.56
+          };
+        }
+
+        const minX = Math.min(...active.map((shard) => shard.homeX));
+        const maxX = Math.max(...active.map((shard) => shard.homeX));
+        const minY = Math.min(...active.map((shard) => shard.homeY));
+        const maxY = Math.max(...active.map((shard) => shard.homeY));
+        const w = Math.max(AppState.canvasWidth * 0.26, maxX - minX);
+        const h = Math.max(AppState.canvasHeight * 0.48, maxY - minY);
+        return {
+          x: (minX + maxX) * 0.5 - w * 0.5,
+          y: (minY + maxY) * 0.5 - h * 0.5,
+          w,
+          h
+        };
       },
 
       draw(targetCtx) {
@@ -4374,7 +4495,7 @@
         : "无";
 
       debugPanelText.textContent = [
-        "灵视档案馆 V0.6",
+        "诡秘之镜 V0.6",
         `阶段: ${AppState.phase}`,
         `体验阶段: ${AppState.experiencePhase}`,
         `幕布事件: ${AppState.lastCurtainEvent || "无"}`,
@@ -4400,6 +4521,7 @@
         `眨眼状态: ${AppState.blinkState}`,
         `睁眼比例: ${AppState.eyeOpenRatio.toFixed(3)}`,
         `眨眼连击: ${AppState.blinkComboCount}/${CONFIG.blinkCombo.requiredCount}`,
+        `碎片重排眨眼: ${AppState.shardReflowBlinkCount}/${CONFIG.blinkCombo.requiredCount}`,
         `切片数量: ${EyeSliceManager.slices.length}`,
         `脸部碎片: ${AppState.faceShardCount}`,
         `碎片冻结: ${formatBool(AppState.faceShardsFrozen)}`,

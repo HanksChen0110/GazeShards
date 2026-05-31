@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="zh-CN">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
@@ -14,6 +14,7 @@
       --muted: rgba(255, 255, 255, 0.58);
       --accent: #7df9ff;
       --accent-strong: #ff4fd8;
+      --accent-warm: #f8ff96;
       --shadow: rgba(0, 0, 0, 0.34);
     }
 
@@ -130,6 +131,12 @@
       cursor: not-allowed;
     }
 
+    .controlButton.is-active {
+      color: #051014;
+      background: linear-gradient(135deg, var(--accent), var(--accent-warm));
+      border-color: transparent;
+    }
+
     #controls {
       position: fixed;
       right: max(16px, env(safe-area-inset-right));
@@ -156,6 +163,34 @@
 
     body.ui-hidden #controls .stageControl {
       display: none;
+    }
+
+    body.recording-mode #controls,
+    body.recording-mode #debugPanel,
+    body.recording-mode #toast,
+    body.recording-mode #guidePanel {
+      display: none;
+    }
+
+    #recordExitBtn {
+      position: fixed;
+      top: max(10px, env(safe-area-inset-top));
+      right: max(10px, env(safe-area-inset-right));
+      z-index: 16;
+      width: 34px;
+      min-width: 34px;
+      height: 34px;
+      min-height: 34px;
+      padding: 0;
+      display: none;
+      border-radius: 999px;
+      font-size: 18px;
+      line-height: 1;
+    }
+
+    body.recording-mode #recordExitBtn {
+      display: inline-grid;
+      place-items: center;
     }
 
     .fileControl {
@@ -222,10 +257,36 @@
       line-height: 1.55;
       white-space: pre-line;
       backdrop-filter: blur(18px);
+      overflow: auto;
     }
 
     body.ui-hidden #debugPanel {
       display: none;
+    }
+
+    #guidePanel {
+      position: fixed;
+      left: max(16px, env(safe-area-inset-left));
+      bottom: max(16px, env(safe-area-inset-bottom));
+      z-index: 9;
+      width: min(320px, calc(100vw - 32px));
+      padding: 12px 14px;
+      border: 1px solid rgba(125, 249, 255, 0.20);
+      border-radius: 8px;
+      background: rgba(5, 8, 12, 0.58);
+      color: rgba(255, 255, 255, 0.78);
+      box-shadow: 0 18px 48px rgba(0, 0, 0, 0.28);
+      backdrop-filter: blur(18px);
+      font-size: 13px;
+      line-height: 1.55;
+      transition: opacity 180ms ease, transform 180ms ease;
+    }
+
+    #guidePanel.hidden,
+    body.ui-hidden #guidePanel {
+      opacity: 0;
+      transform: translateY(10px);
+      pointer-events: none;
     }
 
     @media (max-width: 560px) {
@@ -247,11 +308,35 @@
       #toast {
         bottom: 88px;
       }
+
+      #guidePanel {
+        left: 12px;
+        right: 12px;
+        bottom: 112px;
+        width: auto;
+        font-size: 12px;
+      }
+
+      #debugPanel {
+        left: 12px;
+        right: 12px;
+        top: 12px;
+        width: auto;
+        max-height: calc(100dvh - 320px);
+        font-size: 11px;
+        line-height: 1.42;
+      }
+
+      .controlButton,
+      .fileControl {
+        min-height: 46px;
+      }
     }
   </style>
 </head>
 <body>
   <canvas id="mainCanvas"></canvas>
+  <button id="recordExitBtn" class="controlButton" type="button" title="退出录屏模式">×</button>
 
   <div id="startOverlay">
     <div class="startPanel">
@@ -264,6 +349,10 @@
   <div id="controls">
     <button id="toggleUiBtn" class="controlButton" type="button">隐藏界面</button>
     <button id="toggleDebugBtn" class="controlButton stageControl" type="button">关闭调试</button>
+    <button id="recordModeBtn" class="controlButton stageControl" type="button">录屏模式</button>
+    <button id="resetVisualBtn" class="controlButton stageControl" type="button">重置画面</button>
+    <button id="grayscaleToggleBtn" class="controlButton stageControl is-active" type="button">黑白 开</button>
+    <button id="performanceModeBtn" class="controlButton stageControl" type="button">性能 自动</button>
     <button id="flipCameraBtn" class="controlButton stageControl" type="button">切换镜头</button>
     <label class="fileControl stageControl" aria-disabled="false">
       <span id="mediaUploadLabel">上传图片/视频</span>
@@ -272,6 +361,7 @@
   </div>
 
   <div id="debugPanel"></div>
+  <div id="guidePanel" class="hidden">捏合抓住眼睛或脸部碎片，拖动甩开；眨眼会重组画面。按 H 隐藏界面，D 切换调试，R 重置。</div>
   <div id="toast" role="status" aria-live="polite"></div>
 
   <script>
@@ -303,6 +393,33 @@
         blinkCooldownMs: 350
       },
 
+      visualStyle: {
+        grayscaleEnabled: true,
+        backgroundBlur: 9,
+        filmGrain: 0.16
+      },
+
+      topEyePreview: {
+        enabled: true,
+        widthRatio: 0.34,
+        maxWidth: 320,
+        minWidth: 168,
+        aspectRatio: 2.6,
+        top: 18
+      },
+
+      tarotDeck: {
+        enabled: true,
+        currentIndex: 0,
+        switchCooldownMs: 900,
+        summonDurationMs: 1800
+      },
+
+      blinkCombo: {
+        requiredCount: 3,
+        windowMs: 1800
+      },
+
       eyeSlices: {
         initialCount: 8,
         minScale: 1.2,
@@ -317,7 +434,20 @@
         handDetectEveryNFrames: 2,
         faceDetectEveryNFrames: 6,
         maxParticles: 160,
-        lowResScale: 0.75
+        lowModeParticles: 60,
+        lowResScale: 0.75,
+        lowFpsThreshold: 22,
+        lowFpsMs: 3000,
+        highFpsThreshold: 28,
+        highFpsMs: 5000
+      },
+
+      faceShards: {
+        maxCount: 14,
+        friction: 0.92,
+        scatterForce: 10,
+        grabRadius: 140,
+        reassembleForce: 0.08
       }
     };
 
@@ -331,10 +461,16 @@
     const controls = document.getElementById("controls");
     const toggleUiBtn = document.getElementById("toggleUiBtn");
     const toggleDebugBtn = document.getElementById("toggleDebugBtn");
+    const recordModeBtn = document.getElementById("recordModeBtn");
+    const resetVisualBtn = document.getElementById("resetVisualBtn");
+    const grayscaleToggleBtn = document.getElementById("grayscaleToggleBtn");
+    const performanceModeBtn = document.getElementById("performanceModeBtn");
     const flipCameraBtn = document.getElementById("flipCameraBtn");
     const mediaUpload = document.getElementById("mediaUpload");
     const mediaUploadLabel = document.getElementById("mediaUploadLabel");
     const debugPanel = document.getElementById("debugPanel");
+    const guidePanel = document.getElementById("guidePanel");
+    const recordExitBtn = document.getElementById("recordExitBtn");
     const toast = document.getElementById("toast");
 
     // =====================================================
@@ -351,6 +487,10 @@
       mirrored: true,
       uiHidden: false,
       debug: true,
+      recordingMode: false,
+      guideVisible: false,
+      performanceMode: "auto",
+      grayscaleEnabled: true,
 
       canvasWidth: 0,
       canvasHeight: 0,
@@ -367,13 +507,22 @@
       lastRenderLayers: [],
       pointerActive: false,
       activePointerId: null,
+      grabbedTarget: null,
       lastPinchEvent: "none",
       activePinches: 0,
       detectedHands: 0,
       detectedFaces: 0,
+      faceShardCount: 0,
+      faceShardsFrozen: false,
       lastBlinkTime: 0,
       blinkState: "open",
       eyeOpenRatio: 1,
+      lastHandPose: "none",
+      currentCardId: "fool",
+      currentCardIndex: 0,
+      lastOpenPalmTime: 0,
+      blinkComboCount: 0,
+      gameEnded: false,
 
       errors: []
     };
@@ -534,7 +683,7 @@
 
       drawCamera(targetCtx) {
         if (!AppState.cameraReady || !this.videoEl) return false;
-        drawMediaCover(targetCtx, this.videoEl, AppState.mirrored);
+        CameraStylePipeline.drawBackground(targetCtx, this.videoEl);
         return true;
       },
 
@@ -542,6 +691,70 @@
         if (!AppState.mediaReady || !this.uploadedEl) return false;
         drawMediaCover(targetCtx, this.uploadedEl, false);
         return true;
+      }
+    };
+
+    const CameraStylePipeline = {
+      clearCanvas: document.createElement("canvas"),
+      clearCtx: null,
+      lastClearFrame: -1,
+      lastClearMedia: null,
+      lastClearGrayscale: null,
+
+      updateClearSource(media) {
+        if (!media) return null;
+        const mediaSize = getMediaSize(media);
+        if (!this.clearCtx) {
+          this.clearCtx = this.clearCanvas.getContext("2d");
+        }
+        const sizeChanged = this.clearCanvas.width !== mediaSize.width || this.clearCanvas.height !== mediaSize.height;
+        if (!sizeChanged && this.lastClearFrame === AppState.frameCount && this.lastClearMedia === media && this.lastClearGrayscale === AppState.grayscaleEnabled) {
+          return this.clearCanvas;
+        }
+        if (sizeChanged) {
+          this.clearCanvas.width = mediaSize.width;
+          this.clearCanvas.height = mediaSize.height;
+        }
+
+        this.clearCtx.save();
+        this.clearCtx.clearRect(0, 0, mediaSize.width, mediaSize.height);
+        this.clearCtx.filter = AppState.grayscaleEnabled ? "grayscale(1) contrast(1.08)" : "none";
+        this.clearCtx.drawImage(media, 0, 0, mediaSize.width, mediaSize.height);
+        this.clearCtx.restore();
+        this.lastClearFrame = AppState.frameCount;
+        this.lastClearMedia = media;
+        this.lastClearGrayscale = AppState.grayscaleEnabled;
+        return this.clearCanvas;
+      },
+
+      getClearSource(media) {
+        if (!media) return null;
+        return AppState.grayscaleEnabled ? this.updateClearSource(media) : media;
+      },
+
+      drawBackground(targetCtx, media) {
+        targetCtx.save();
+        const filters = [];
+        if (AppState.grayscaleEnabled) {
+          filters.push("grayscale(1)", "contrast(1.08)");
+        }
+        const blurAmount = (PerformanceManager.effectiveMode === "low" || AppState.gameEnded)
+          ? Math.min(CONFIG.visualStyle.backgroundBlur, 4)
+          : CONFIG.visualStyle.backgroundBlur;
+        if (blurAmount > 0) {
+          filters.push(`blur(${blurAmount}px)`);
+        }
+        targetCtx.filter = filters.join(" ") || "none";
+        drawMediaCover(targetCtx, media, AppState.mirrored);
+        targetCtx.restore();
+      },
+
+      setGrayscale(enabled) {
+        AppState.grayscaleEnabled = enabled;
+        CONFIG.visualStyle.grayscaleEnabled = enabled;
+        grayscaleToggleBtn.textContent = enabled ? "黑白 开" : "黑白 关";
+        grayscaleToggleBtn.classList.toggle("is-active", enabled);
+        grayscaleToggleBtn.setAttribute("aria-pressed", String(enabled));
       }
     };
 
@@ -731,6 +944,8 @@
         const ratio = Math.min(leftRatio, rightRatio);
         BlinkDetector.update(ratio, timestamp);
         EyeSliceManager.updateEyeRects(this.lastEyeRects);
+        TopEyePreview.updateFromEyeRects(this.lastEyeRects);
+        FaceShardManager.updateFromFaceBox(this.lastFaceBox);
         return this.lastEyeRects;
       },
 
@@ -814,6 +1029,8 @@
             this.lastBlinkTime = now;
             AppState.lastBlinkTime = now;
             EyeSliceManager.triggerBlinkEffect();
+            FaceShardManager.triggerReassemble();
+            TarotCardManager.registerBlink(now);
             return true;
           }
         } else if (ratio >= CONFIG.face.blinkThreshold) {
@@ -869,15 +1086,101 @@
           return;
         }
 
-        if (this.handEnabled && AppState.frameCount % CONFIG.performance.handDetectEveryNFrames === 0) {
+        if (this.handEnabled && PerformanceManager.shouldDetectHand(AppState.frameCount)) {
           const hands = HandTracker.detect(SourceManager.videoEl, timestamp);
           AppState.detectedHands = hands.length;
           PinchStateMachine.update(hands, timestamp);
+          HandPoseDetector.update(hands, timestamp);
         }
 
-        if (this.faceEnabled && AppState.frameCount % CONFIG.performance.faceDetectEveryNFrames === 0) {
+        if (this.faceEnabled && PerformanceManager.shouldDetectFace(AppState.frameCount)) {
           FaceTracker.detect(SourceManager.videoEl, timestamp);
         }
+      }
+    };
+
+    const PerformanceManager = {
+      mode: "auto",
+      effectiveMode: "high",
+      lowSince: null,
+      highSince: null,
+
+      setMode(nextMode) {
+        this.mode = nextMode;
+        this.effectiveMode = nextMode === "low" ? "low" : "high";
+        AppState.performanceMode = nextMode === "auto" ? `auto/${this.effectiveMode}` : nextMode;
+        this.lowSince = null;
+        this.highSince = null;
+        performanceModeBtn.textContent = `性能 ${this.getLabel()}`;
+        performanceModeBtn.classList.toggle("is-active", this.effectiveMode === "low");
+      },
+
+      cycleMode() {
+        const nextMode = this.mode === "auto"
+          ? "high"
+          : this.mode === "high"
+            ? "low"
+            : "auto";
+        this.setMode(nextMode);
+        showToast(`性能模式：${this.getLabel()}`);
+      },
+
+      getLabel() {
+        if (this.mode === "high") return "高";
+        if (this.mode === "low") return "低";
+        return "自动";
+      },
+
+      updateFPS(fps, now) {
+        if (!fps) return;
+        if (this.mode === "high") {
+          this.effectiveMode = "high";
+          AppState.performanceMode = "high";
+          return;
+        }
+        if (this.mode === "low") {
+          this.effectiveMode = "low";
+          AppState.performanceMode = "low";
+          return;
+        }
+
+        if (fps < CONFIG.performance.lowFpsThreshold) {
+          this.lowSince = this.lowSince || now;
+          this.highSince = null;
+          if (now - this.lowSince > CONFIG.performance.lowFpsMs) {
+            this.effectiveMode = "low";
+            AppState.performanceMode = "auto/low";
+            performanceModeBtn.classList.add("is-active");
+            showToast("已自动切换低性能模式，优先保持流畅。");
+          }
+        } else if (fps > CONFIG.performance.highFpsThreshold) {
+          this.highSince = this.highSince || now;
+          this.lowSince = null;
+          if (now - this.highSince > CONFIG.performance.highFpsMs && this.effectiveMode === "low") {
+            this.effectiveMode = "high";
+            AppState.performanceMode = "auto/high";
+            performanceModeBtn.classList.remove("is-active");
+          }
+        } else {
+          this.lowSince = null;
+          this.highSince = null;
+        }
+      },
+
+      shouldDetectHand(frameCount) {
+        const interval = this.effectiveMode === "low" ? 3 : CONFIG.performance.handDetectEveryNFrames;
+        return frameCount % interval === 0;
+      },
+
+      shouldDetectFace(frameCount) {
+        const interval = this.effectiveMode === "low" ? 8 : CONFIG.performance.faceDetectEveryNFrames;
+        return frameCount % interval === 0;
+      },
+
+      getMaxParticles() {
+        return this.effectiveMode === "low"
+          ? CONFIG.performance.lowModeParticles
+          : CONFIG.performance.maxParticles;
       }
     };
 
@@ -907,7 +1210,38 @@
       }
     }
 
+    function setRecordingMode(enabled) {
+      AppState.recordingMode = enabled;
+      document.body.classList.toggle("recording-mode", enabled);
+      recordModeBtn.classList.toggle("is-active", enabled);
+      recordModeBtn.setAttribute("aria-pressed", String(enabled));
+      if (enabled) {
+        guidePanel.classList.add("hidden");
+        toast.classList.remove("visible");
+      }
+    }
+
+    function showGuide() {
+      AppState.guideVisible = true;
+      guidePanel.classList.remove("hidden");
+      window.setTimeout(() => {
+        guidePanel.classList.add("hidden");
+        AppState.guideVisible = false;
+      }, 8500);
+    }
+
+    function resetVisualElements() {
+      AppState.gameEnded = false;
+      AppState.blinkComboCount = 0;
+      EyeSliceManager.createMockSlices();
+      FaceShardManager.reset();
+      TarotCardManager.reset();
+      ParticleManager.clear();
+      showToast("视觉元素已重置。");
+    }
+
     function showToast(message) {
+      if (AppState.recordingMode) return;
       toast.textContent = message;
       toast.classList.add("visible");
       window.clearTimeout(toastTimer);
@@ -924,19 +1258,93 @@
     }
 
     function onPinchDown(x, y) {
+      if (AppState.gameEnded) return false;
       AppState.lastPinchEvent = "PINCH_DOWN";
-      return EyeSliceManager.grabAt(x, y);
+      if (EyeSliceManager.grabAt(x, y)) {
+        AppState.grabbedTarget = "eye";
+        return true;
+      }
+      if (FaceShardManager.grabAt(x, y)) {
+        AppState.grabbedTarget = "face";
+        return true;
+      }
+      AppState.grabbedTarget = null;
+      return false;
     }
 
     function onPinchDrag(x, y) {
       AppState.lastPinchEvent = "PINCH_DRAG";
+      if (AppState.grabbedTarget === "face") {
+        return FaceShardManager.dragTo(x, y);
+      }
       return EyeSliceManager.dragTo(x, y);
     }
 
     function onPinchUp(vx, vy) {
       AppState.lastPinchEvent = "PINCH_UP";
-      return EyeSliceManager.release(vx, vy);
+      let released = false;
+      if (AppState.grabbedTarget === "face") {
+        released = FaceShardManager.release(vx, vy);
+      } else {
+        released = EyeSliceManager.release(vx, vy);
+      }
+      AppState.grabbedTarget = null;
+      return released;
     }
+
+    const HandPoseDetector = {
+      lastPose: "none",
+      lastTriggerTime: 0,
+      cooldownMs: 900,
+
+      update(hands, timestamp = performance.now()) {
+        if (!hands.length) {
+          AppState.lastHandPose = "none";
+          return;
+        }
+
+        const pose = this.classify(hands[0].landmarks);
+        AppState.lastHandPose = pose;
+        if (pose === this.lastPose || timestamp - this.lastTriggerTime < this.cooldownMs) return;
+
+        if (pose === "open") {
+          OpenPalmDetector.trigger(timestamp);
+          this.lastTriggerTime = timestamp;
+        } else if (pose === "fist") {
+          FaceShardManager.triggerFreeze();
+          this.lastTriggerTime = timestamp;
+        }
+        this.lastPose = pose;
+      },
+
+      classify(points) {
+        const wrist = points[0];
+        const indexBase = points[5];
+        if (!wrist || !indexBase) return "unknown";
+
+        const palmSize = Math.max(0.001, Math.hypot(indexBase.x - wrist.x, indexBase.y - wrist.y));
+        const tips = [8, 12, 16, 20].map((index) => points[index]).filter(Boolean);
+        if (tips.length < 4) return "unknown";
+
+        const openness = tips.reduce((sum, point) => {
+          return sum + Math.hypot(point.x - wrist.x, point.y - wrist.y) / palmSize;
+        }, 0) / tips.length;
+
+        if (openness > 1.45) return "open";
+        if (openness < 0.95) return "fist";
+        return "neutral";
+      }
+    };
+
+    const OpenPalmDetector = {
+      trigger(timestamp = performance.now()) {
+        if (timestamp - AppState.lastOpenPalmTime < CONFIG.tarotDeck.switchCooldownMs) return false;
+        AppState.lastOpenPalmTime = timestamp;
+        FaceShardManager.triggerScatter(0.45);
+        TarotCardManager.nextCard(timestamp);
+        return true;
+      }
+    };
 
     const PinchStateMachine = {
       hands: new Map(),
@@ -1185,6 +1593,235 @@
       targetCtx.restore();
     }
 
+    const TopEyePreview = {
+      lastRect: null,
+      sourceRect: null,
+
+      updateFromEyeRects(eyeRects) {
+        if (!eyeRects || !eyeRects.length) return;
+        if (eyeRects.length === 1) {
+          this.lastRect = eyeRects[0];
+          this.sourceRect = this.lastRect;
+          return;
+        }
+        const minX = Math.min(...eyeRects.map((rect) => rect.x));
+        const minY = Math.min(...eyeRects.map((rect) => rect.y));
+        const maxX = Math.max(...eyeRects.map((rect) => rect.x + rect.w));
+        const maxY = Math.max(...eyeRects.map((rect) => rect.y + rect.h));
+        const w = maxX - minX;
+        const h = maxY - minY;
+        this.lastRect = {
+          x: Math.max(0, minX - w * 0.12),
+          y: Math.max(0, minY - h * 0.6),
+          w: w * 1.24,
+          h: h * 2.2,
+          side: "both"
+        };
+        this.sourceRect = this.lastRect;
+      },
+
+      draw(targetCtx) {
+        if (!CONFIG.topEyePreview.enabled) return;
+        const width = Math.max(
+          CONFIG.topEyePreview.minWidth,
+          Math.min(CONFIG.topEyePreview.maxWidth, AppState.canvasWidth * CONFIG.topEyePreview.widthRatio)
+        );
+        const height = width / CONFIG.topEyePreview.aspectRatio;
+        const x = (AppState.canvasWidth - width) * 0.5;
+        const y = CONFIG.topEyePreview.top + Math.max(0, window.visualViewport?.offsetTop || 0);
+        const sourceMedia = SourceManager.videoEl
+          ? CameraStylePipeline.getClearSource(SourceManager.videoEl)
+          : null;
+
+        targetCtx.save();
+        targetCtx.shadowColor = "rgba(0, 0, 0, 0.52)";
+        targetCtx.shadowBlur = 22;
+        targetCtx.fillStyle = "rgba(4, 6, 8, 0.72)";
+        targetCtx.fillRect(x, y, width, height);
+
+        if (sourceMedia && this.lastRect) {
+          try {
+            targetCtx.drawImage(
+              sourceMedia,
+              this.lastRect.x,
+              this.lastRect.y,
+              this.lastRect.w,
+              this.lastRect.h,
+              x,
+              y,
+              width,
+              height
+            );
+          } catch (error) {
+            this.drawPlaceholder(targetCtx, x, y, width, height);
+          }
+        } else {
+          this.drawPlaceholder(targetCtx, x, y, width, height);
+        }
+
+        targetCtx.shadowColor = "transparent";
+        targetCtx.strokeStyle = "rgba(255, 255, 255, 0.84)";
+        targetCtx.lineWidth = 1.5;
+        targetCtx.strokeRect(x, y, width, height);
+        targetCtx.strokeStyle = "rgba(0, 0, 0, 0.85)";
+        const corner = Math.min(24, height * 0.36);
+        targetCtx.lineWidth = 4;
+        targetCtx.beginPath();
+        targetCtx.moveTo(x, y + corner);
+        targetCtx.lineTo(x, y);
+        targetCtx.lineTo(x + corner, y);
+        targetCtx.moveTo(x + width - corner, y);
+        targetCtx.lineTo(x + width, y);
+        targetCtx.lineTo(x + width, y + corner);
+        targetCtx.moveTo(x + width, y + height - corner);
+        targetCtx.lineTo(x + width, y + height);
+        targetCtx.lineTo(x + width - corner, y + height);
+        targetCtx.moveTo(x + corner, y + height);
+        targetCtx.lineTo(x, y + height);
+        targetCtx.lineTo(x, y + height - corner);
+        targetCtx.stroke();
+        targetCtx.restore();
+      },
+
+      drawPlaceholder(targetCtx, x, y, width, height) {
+        targetCtx.fillStyle = "rgba(255, 255, 255, 0.08)";
+        targetCtx.fillRect(x, y, width, height);
+        targetCtx.fillStyle = "rgba(255, 255, 255, 0.55)";
+        targetCtx.font = "12px sans-serif";
+        targetCtx.textAlign = "center";
+        targetCtx.textBaseline = "middle";
+        targetCtx.fillText("EYE SIGNAL", x + width * 0.5, y + height * 0.5);
+      }
+    };
+
+    const TarotCardManager = {
+      cards: [
+        { id: "fool", zh: "愚者", en: "THE FOOL", colors: ["#5b3fd6", "#f6d36c"], mark: "0" },
+        { id: "justice", zh: "正义", en: "JUSTICE", colors: ["#194f7a", "#f0f3ff"], mark: "XI" },
+        { id: "hanged", zh: "倒吊人", en: "THE HANGED MAN", colors: ["#30323f", "#d95f50"], mark: "XII" },
+        { id: "sun", zh: "太阳", en: "THE SUN", colors: ["#f6b13d", "#fff0a8"], mark: "XIX" },
+        { id: "magician", zh: "魔术师", en: "THE MAGICIAN", colors: ["#7c2438", "#f4d3a1"], mark: "I" },
+        { id: "hermit", zh: "隐者", en: "THE HERMIT", colors: ["#1f5a54", "#d6f0d8"], mark: "IX" },
+        { id: "star", zh: "星星", en: "THE STAR", colors: ["#173a8a", "#9fd4ff"], mark: "XVII" },
+        { id: "moon", zh: "月亮", en: "THE MOON", colors: ["#32205f", "#d9c6ff"], mark: "XVIII" }
+      ],
+      lastComboBlinkTime: 0,
+      lastSwitchTime: 0,
+      summonStartedAt: 0,
+
+      reset() {
+        this.lastComboBlinkTime = 0;
+        this.summonStartedAt = 0;
+        this.setCurrent(CONFIG.tarotDeck.currentIndex || 0);
+      },
+
+      setCurrent(index) {
+        const nextIndex = ((index % this.cards.length) + this.cards.length) % this.cards.length;
+        CONFIG.tarotDeck.currentIndex = nextIndex;
+        AppState.currentCardIndex = nextIndex;
+        AppState.currentCardId = this.cards[nextIndex].id;
+      },
+
+      nextCard(timestamp = performance.now()) {
+        if (!CONFIG.tarotDeck.enabled || AppState.gameEnded) return;
+        if (timestamp - this.lastSwitchTime < CONFIG.tarotDeck.switchCooldownMs) return;
+        this.lastSwitchTime = timestamp;
+        this.setCurrent(AppState.currentCardIndex + 1);
+        showToast(`塔罗切换：${this.cards[AppState.currentCardIndex].zh}`);
+      },
+
+      registerBlink(timestamp = performance.now()) {
+        if (AppState.gameEnded) return;
+        if (timestamp - this.lastComboBlinkTime > CONFIG.blinkCombo.windowMs) {
+          AppState.blinkComboCount = 0;
+        }
+        this.lastComboBlinkTime = timestamp;
+        AppState.blinkComboCount += 1;
+        if (AppState.blinkComboCount >= CONFIG.blinkCombo.requiredCount) {
+          this.summonFool(timestamp);
+        }
+      },
+
+      summonFool(timestamp = performance.now()) {
+        this.setCurrent(0);
+        AppState.gameEnded = true;
+        AppState.blinkComboCount = CONFIG.blinkCombo.requiredCount;
+        this.summonStartedAt = timestamp;
+        FaceShardManager.triggerFreeze();
+        ParticleManager.emit(AppState.canvasWidth * 0.5, AppState.canvasHeight * 0.5, 42, "face");
+        showToast("愚者已被召唤。");
+      },
+
+      draw(targetCtx, timestamp) {
+        if (!CONFIG.tarotDeck.enabled) return;
+        const card = this.cards[AppState.currentCardIndex] || this.cards[0];
+        const baseW = AppState.gameEnded
+          ? Math.min(300, AppState.canvasWidth * 0.44)
+          : Math.min(156, Math.max(104, AppState.canvasWidth * 0.15));
+        const w = baseW;
+        const h = w * 1.56;
+        const pulse = AppState.gameEnded ? Math.sin(timestamp * 0.006) * 0.025 + 1.08 : 1;
+        const x = AppState.gameEnded
+          ? AppState.canvasWidth * 0.5
+          : Math.max(18 + w * 0.5, AppState.canvasWidth * 0.12);
+        const y = AppState.gameEnded
+          ? AppState.canvasHeight * 0.52
+          : AppState.canvasHeight * 0.58;
+        this.drawCard(targetCtx, card, x, y, w * pulse, h * pulse, AppState.gameEnded);
+      },
+
+      drawCard(targetCtx, card, x, y, w, h, summoned) {
+        targetCtx.save();
+        targetCtx.translate(x, y);
+        targetCtx.shadowColor = `${card.colors[0]}aa`;
+        targetCtx.shadowBlur = summoned ? 42 : 20;
+        targetCtx.fillStyle = "#111";
+        targetCtx.fillRect(-w / 2, -h / 2, w, h);
+
+        const gradient = targetCtx.createLinearGradient(-w / 2, -h / 2, w / 2, h / 2);
+        gradient.addColorStop(0, card.colors[0]);
+        gradient.addColorStop(0.52, "#15151f");
+        gradient.addColorStop(1, card.colors[1]);
+        targetCtx.fillStyle = gradient;
+        targetCtx.fillRect(-w / 2 + 5, -h / 2 + 5, w - 10, h - 10);
+
+        targetCtx.strokeStyle = "rgba(255, 236, 190, 0.9)";
+        targetCtx.lineWidth = summoned ? 3 : 2;
+        targetCtx.strokeRect(-w / 2 + 9, -h / 2 + 9, w - 18, h - 18);
+        targetCtx.strokeStyle = "rgba(255, 255, 255, 0.35)";
+        targetCtx.strokeRect(-w / 2 + 18, -h / 2 + 18, w - 36, h - 36);
+
+        targetCtx.fillStyle = "rgba(255, 245, 214, 0.95)";
+        targetCtx.textAlign = "center";
+        targetCtx.textBaseline = "middle";
+        targetCtx.font = `${Math.max(16, w * 0.22)}px Georgia, serif`;
+        targetCtx.fillText(card.mark, 0, -h * 0.22);
+        targetCtx.font = `${Math.max(12, w * 0.1)}px Georgia, serif`;
+        targetCtx.fillText(card.en, 0, h * 0.32);
+        targetCtx.font = `${Math.max(13, w * 0.12)}px sans-serif`;
+        targetCtx.fillText(card.zh, 0, h * 0.42);
+
+        targetCtx.globalAlpha = 0.9;
+        targetCtx.beginPath();
+        targetCtx.arc(0, 0, w * 0.18, 0, Math.PI * 2);
+        targetCtx.strokeStyle = "rgba(255, 255, 255, 0.56)";
+        targetCtx.stroke();
+        targetCtx.beginPath();
+        targetCtx.moveTo(0, -w * 0.27);
+        targetCtx.lineTo(w * 0.22, w * 0.14);
+        targetCtx.lineTo(-w * 0.22, w * 0.14);
+        targetCtx.closePath();
+        targetCtx.stroke();
+
+        if (summoned) {
+          targetCtx.globalAlpha = 0.18;
+          targetCtx.fillStyle = "#fff";
+          targetCtx.fillRect(-w / 2, -h / 2, w, h);
+        }
+        targetCtx.restore();
+      }
+    };
+
     class EyeSlice {
       constructor(options) {
         this.id = options.id;
@@ -1390,8 +2027,7 @@
         const liveRects = FaceTracker.getEyeRects();
 
         const count = CONFIG.eyeSlices.initialCount;
-        const baseW = Math.max(92, Math.min(180, AppState.canvasWidth * 0.12));
-        const baseH = Math.max(34, Math.min(72, AppState.canvasHeight * 0.08));
+        const baseSize = Math.max(76, Math.min(142, Math.min(AppState.canvasWidth, AppState.canvasHeight) * 0.14));
 
         for (let i = 0; i < count; i += 1) {
           const angle = (i / count) * Math.PI * 2;
@@ -1407,8 +2043,8 @@
             y: AppState.canvasHeight * 0.48 + Math.sin(angle) * radiusY,
             homeX: AppState.canvasWidth * 0.5 + Math.cos(angle) * radiusX,
             homeY: AppState.canvasHeight * 0.48 + Math.sin(angle) * radiusY,
-            w: baseW * (0.82 + (i % 3) * 0.12),
-            h: baseH,
+            w: baseSize * (0.86 + (i % 3) * 0.08),
+            h: baseSize * (0.86 + (i % 3) * 0.08),
             vx: Math.sin(angle) * 0.25,
             vy: Math.cos(angle) * 0.22,
             rotation: (i - count / 2) * 0.05,
@@ -1421,12 +2057,13 @@
 
       createSliceFromEyeRect(eyeRect) {
         const id = `eye-${Date.now()}-${this.slices.length}`;
+        const side = Math.max(76, Math.min(156, Math.max(eyeRect.w, eyeRect.h) * 1.45));
         const slice = new EyeSlice({
           id,
           x: AppState.canvasWidth * 0.5,
           y: AppState.canvasHeight * 0.44,
-          w: Math.max(100, eyeRect.w * 1.6),
-          h: Math.max(36, eyeRect.h * 1.6),
+          w: side,
+          h: side,
           sourceEye: eyeRect.side,
           sourceRect: eyeRect
         });
@@ -1460,7 +2097,7 @@
 
       getSourceMedia() {
         if (AppState.cameraReady && SourceManager.videoEl) {
-          return SourceManager.videoEl;
+          return CameraStylePipeline.getClearSource(SourceManager.videoEl);
         }
         return null;
       },
@@ -1557,6 +2194,383 @@
       }
     };
 
+    class FaceShard {
+      constructor(options) {
+        this.id = options.id;
+        this.sourceRect = options.sourceRect;
+        this.x = options.x;
+        this.y = options.y;
+        this.homeX = options.homeX;
+        this.homeY = options.homeY;
+        this.w = options.w;
+        this.h = options.h;
+        this.vx = options.vx || 0;
+        this.vy = options.vy || 0;
+        this.rotation = options.rotation || 0;
+        this.angularVelocity = options.angularVelocity || 0;
+        this.alpha = 0.82;
+        this.scale = options.scale || 1;
+        this.targetScale = 1;
+        this.isGrabbed = false;
+        this.grabOffsetX = 0;
+        this.grabOffsetY = 0;
+        this.seed = Math.random() * 1000;
+      }
+
+      update(dt) {
+        if (FaceShardManager.frozen && !this.isGrabbed) return;
+        if (!this.isGrabbed) {
+          this.vx += (this.homeX - this.x) * CONFIG.faceShards.reassembleForce * dt;
+          this.vy += (this.homeY - this.y) * CONFIG.faceShards.reassembleForce * dt;
+          this.x += this.vx * dt * 60;
+          this.y += this.vy * dt * 60;
+          this.vx *= CONFIG.faceShards.friction;
+          this.vy *= CONFIG.faceShards.friction;
+          this.rotation += this.angularVelocity * dt * 60;
+          this.angularVelocity *= CONFIG.faceShards.friction;
+        }
+        this.scale += (this.targetScale - this.scale) * Math.min(1, dt * 10);
+      }
+
+      draw(targetCtx, sourceMedia) {
+        const drawW = this.w * this.scale;
+        const drawH = this.h * this.scale;
+        targetCtx.save();
+        targetCtx.translate(this.x, this.y);
+        targetCtx.rotate(this.rotation);
+        targetCtx.globalAlpha = this.alpha;
+        targetCtx.shadowColor = "rgba(125, 249, 255, 0.24)";
+        targetCtx.shadowBlur = 18;
+
+        if (sourceMedia && this.sourceRect) {
+          try {
+            targetCtx.drawImage(
+              sourceMedia,
+              this.sourceRect.x,
+              this.sourceRect.y,
+              this.sourceRect.w,
+              this.sourceRect.h,
+              -drawW / 2,
+              -drawH / 2,
+              drawW,
+              drawH
+            );
+          } catch (error) {
+            this.drawFallback(targetCtx, drawW, drawH);
+          }
+        } else {
+          this.drawFallback(targetCtx, drawW, drawH);
+        }
+
+        targetCtx.shadowColor = "transparent";
+        targetCtx.strokeStyle = this.isGrabbed
+          ? "rgba(248, 255, 150, 0.95)"
+          : "rgba(255, 255, 255, 0.26)";
+        targetCtx.lineWidth = this.isGrabbed ? 2 : 1;
+        targetCtx.strokeRect(-drawW / 2, -drawH / 2, drawW, drawH);
+        targetCtx.restore();
+      }
+
+      drawFallback(targetCtx, drawW, drawH) {
+        targetCtx.fillStyle = "rgba(255, 79, 216, 0.16)";
+        targetCtx.fillRect(-drawW / 2, -drawH / 2, drawW, drawH);
+      }
+
+      containsPoint(x, y) {
+        const dx = x - this.x;
+        const dy = y - this.y;
+        return Math.abs(dx) <= (this.w * this.scale) / 2 && Math.abs(dy) <= (this.h * this.scale) / 2;
+      }
+
+      grab(x, y) {
+        this.isGrabbed = true;
+        this.grabOffsetX = this.x - x;
+        this.grabOffsetY = this.y - y;
+        this.targetScale = 1.08;
+        this.vx = 0;
+        this.vy = 0;
+      }
+
+      drag(x, y) {
+        this.x = x + this.grabOffsetX;
+        this.y = y + this.grabOffsetY;
+      }
+
+      release(vx, vy) {
+        this.isGrabbed = false;
+        this.targetScale = 1;
+        this.vx = Math.max(-32, Math.min(32, vx));
+        this.vy = Math.max(-32, Math.min(32, vy));
+        this.angularVelocity = Math.max(-0.07, Math.min(0.07, vx * 0.003));
+      }
+    }
+
+    const FaceShardManager = {
+      shards: [],
+      grabbedShard: null,
+      pointerHistory: [],
+      lastFaceArea: 0,
+      frozen: false,
+
+      updateFromFaceBox(faceRect) {
+        if (!faceRect) return;
+        if (!this.shards.length) {
+          this.createFromFaceRect(faceRect);
+          return;
+        }
+
+        const mapped = mapVideoRectToCanvas(faceRect);
+        const faceArea = mapped ? mapped.w * mapped.h : 0;
+        if (this.lastFaceArea && faceArea) {
+          const ratio = faceArea / this.lastFaceArea;
+          if (ratio > 1.18) this.triggerScalePulse(1.16);
+          if (ratio < 0.84) this.triggerScatter(0.45);
+        }
+        this.lastFaceArea = faceArea || this.lastFaceArea;
+
+        const layout = this.buildLayout(faceRect);
+        this.shards.forEach((shard, index) => {
+          const next = layout[index % layout.length];
+          shard.sourceRect = next.sourceRect;
+          shard.homeX = next.homeX;
+          shard.homeY = next.homeY;
+          shard.w = next.w;
+          shard.h = next.h;
+        });
+      },
+
+      createFromFaceRect(faceRect) {
+        this.shards = this.buildLayout(faceRect).map((item, index) => new FaceShard({
+          id: `face-${index}`,
+          ...item,
+          vx: (Math.random() - 0.5) * 1.2,
+          vy: (Math.random() - 0.5) * 1.2,
+          rotation: (index - 5) * 0.025,
+          angularVelocity: index % 2 ? 0.005 : -0.005
+        }));
+        AppState.faceShardCount = this.shards.length;
+      },
+
+      buildLayout(faceRect) {
+        const mapped = mapVideoRectToCanvas(faceRect);
+        if (!mapped) return [];
+        const mediaSize = SourceManager.videoEl ? getMediaSize(SourceManager.videoEl) : null;
+
+        const regions = [
+          { x: 0.22, y: 0.06, size: 0.22 },
+          { x: 0.56, y: 0.06, size: 0.22 },
+          { x: 0.26, y: 0.24, size: 0.20 },
+          { x: 0.54, y: 0.24, size: 0.20 },
+          { x: 0.40, y: 0.38, size: 0.22 },
+          { x: 0.18, y: 0.42, size: 0.24 },
+          { x: 0.58, y: 0.42, size: 0.24 },
+          { x: 0.32, y: 0.64, size: 0.22 },
+          { x: 0.52, y: 0.64, size: 0.22 },
+          { x: 0.08, y: 0.22, size: 0.18 },
+          { x: 0.74, y: 0.22, size: 0.18 },
+          { x: 0.12, y: 0.70, size: 0.18 },
+          { x: 0.70, y: 0.70, size: 0.18 },
+          { x: 0.42, y: 0.78, size: 0.18 }
+        ].slice(0, CONFIG.faceShards.maxCount);
+
+        return regions.map((region, index) => {
+          const sourceSide = Math.max(6, Math.min(faceRect.w, faceRect.h) * region.size);
+          const centerX = faceRect.x + faceRect.w * region.x;
+          const centerY = faceRect.y + faceRect.h * region.y;
+          const maxX = mediaSize ? Math.max(0, mediaSize.width - sourceSide) : Number.POSITIVE_INFINITY;
+          const maxY = mediaSize ? Math.max(0, mediaSize.height - sourceSide) : Number.POSITIVE_INFINITY;
+          const sourceRect = {
+            x: Math.max(0, Math.min(maxX, centerX - sourceSide * 0.5)),
+            y: Math.max(0, Math.min(maxY, centerY - sourceSide * 0.5)),
+            w: sourceSide,
+            h: sourceSide
+          };
+          const homeX = mapped.x + mapped.w * region.x + Math.sin(index) * 10;
+          const homeY = mapped.y + mapped.h * region.y + Math.cos(index * 1.4) * 8;
+          const side = Math.max(34, Math.min(132, Math.min(mapped.w, mapped.h) * region.size * 1.35));
+          return {
+            sourceRect,
+            homeX,
+            homeY,
+            x: homeX + Math.sin(index * 1.8) * 26,
+            y: homeY + Math.cos(index * 1.3) * 18,
+            w: side,
+            h: side
+          };
+        });
+      },
+
+      update(dt) {
+        this.shards.forEach((shard) => shard.update(dt));
+        AppState.faceShardCount = this.shards.length;
+      },
+
+      draw(targetCtx) {
+        const sourceMedia = SourceManager.videoEl
+          ? CameraStylePipeline.getClearSource(SourceManager.videoEl)
+          : null;
+        this.shards.forEach((shard) => shard.draw(targetCtx, sourceMedia));
+      },
+
+      triggerScatter(intensity = 1) {
+        this.frozen = false;
+        AppState.faceShardsFrozen = false;
+        this.shards.forEach((shard, index) => {
+          const angle = index * 1.74;
+          shard.vx += Math.cos(angle) * CONFIG.faceShards.scatterForce * intensity;
+          shard.vy += Math.sin(angle) * CONFIG.faceShards.scatterForce * intensity;
+          shard.angularVelocity += (index % 2 ? 0.035 : -0.035) * intensity;
+        });
+        ParticleManager.emit(AppState.canvasWidth * 0.5, AppState.canvasHeight * 0.45, 18, "face");
+      },
+
+      triggerReassemble() {
+        this.frozen = false;
+        AppState.faceShardsFrozen = false;
+        this.shards.forEach((shard) => {
+          shard.vx += (shard.homeX - shard.x) * 0.08;
+          shard.vy += (shard.homeY - shard.y) * 0.08;
+          shard.targetScale = 0.96;
+        });
+        ParticleManager.emit(AppState.canvasWidth * 0.5, AppState.canvasHeight * 0.42, 24, "blink");
+      },
+
+      triggerScalePulse(scale = 1.12) {
+        this.frozen = false;
+        AppState.faceShardsFrozen = false;
+        this.shards.forEach((shard) => {
+          shard.targetScale = scale;
+          shard.vx += (shard.x - AppState.canvasWidth * 0.5) * 0.008;
+          shard.vy += (shard.y - AppState.canvasHeight * 0.45) * 0.008;
+        });
+        ParticleManager.emit(AppState.canvasWidth * 0.5, AppState.canvasHeight * 0.42, 12, "face");
+      },
+
+      triggerFreeze() {
+        if (!this.shards.length) return;
+        this.frozen = true;
+        AppState.faceShardsFrozen = true;
+        this.shards.forEach((shard) => {
+          shard.vx = 0;
+          shard.vy = 0;
+          shard.angularVelocity = 0;
+          shard.targetScale = 1.02;
+        });
+        ParticleManager.emit(AppState.canvasWidth * 0.5, AppState.canvasHeight * 0.42, 10, "blink");
+      },
+
+      grabAt(x, y) {
+        let best = null;
+        let bestDistance = CONFIG.faceShards.grabRadius;
+        for (let i = this.shards.length - 1; i >= 0; i -= 1) {
+          const shard = this.shards[i];
+          const distance = Math.hypot(shard.x - x, shard.y - y);
+          if ((shard.containsPoint(x, y) || distance < bestDistance) && distance <= bestDistance) {
+            best = shard;
+            bestDistance = distance;
+          }
+        }
+        if (!best) return false;
+        this.grabbedShard = best;
+        this.pointerHistory = [{ x, y, time: performance.now() }];
+        best.grab(x, y);
+        return true;
+      },
+
+      dragTo(x, y) {
+        if (!this.grabbedShard) return false;
+        this.grabbedShard.drag(x, y);
+        this.recordPointer(x, y);
+        return true;
+      },
+
+      release(vx, vy) {
+        if (!this.grabbedShard) return false;
+        this.grabbedShard.release(vx, vy);
+        this.grabbedShard = null;
+        this.pointerHistory = [];
+        return true;
+      },
+
+      recordPointer(x, y) {
+        const now = performance.now();
+        this.pointerHistory.push({ x, y, time: now });
+        this.pointerHistory = this.pointerHistory.filter((point) => now - point.time <= 140).slice(-6);
+      },
+
+      getReleaseVelocity() {
+        if (this.pointerHistory.length < 2) return { vx: 0, vy: 0 };
+        const first = this.pointerHistory[0];
+        const last = this.pointerHistory[this.pointerHistory.length - 1];
+        const dt = Math.max(16, last.time - first.time);
+        return {
+          vx: ((last.x - first.x) / dt) * 16.67,
+          vy: ((last.y - first.y) / dt) * 16.67
+        };
+      },
+
+      reset() {
+        this.shards = [];
+        this.grabbedShard = null;
+        this.pointerHistory = [];
+        this.lastFaceArea = 0;
+        this.frozen = false;
+        AppState.faceShardCount = 0;
+        AppState.faceShardsFrozen = false;
+      }
+    };
+
+    const ParticleManager = {
+      particles: [],
+
+      emit(x, y, count, type = "blink") {
+        const maxParticles = PerformanceManager.getMaxParticles();
+        for (let i = 0; i < count && this.particles.length < maxParticles; i += 1) {
+          const angle = Math.random() * Math.PI * 2;
+          const speed = 1.2 + Math.random() * 5;
+          this.particles.push({
+            x,
+            y,
+            vx: Math.cos(angle) * speed,
+            vy: Math.sin(angle) * speed,
+            life: 0.8 + Math.random() * 0.7,
+            maxLife: 1.2,
+            size: 1.5 + Math.random() * 3,
+            color: type === "face" ? "rgba(255, 79, 216," : "rgba(125, 249, 255,"
+          });
+        }
+      },
+
+      update(dt) {
+        this.particles.forEach((particle) => {
+          particle.x += particle.vx * dt * 60;
+          particle.y += particle.vy * dt * 60;
+          particle.vx *= 0.96;
+          particle.vy *= 0.96;
+          particle.life -= dt;
+        });
+        this.particles = this.particles
+          .filter((particle) => particle.life > 0)
+          .slice(-PerformanceManager.getMaxParticles());
+      },
+
+      draw(targetCtx) {
+        targetCtx.save();
+        this.particles.forEach((particle) => {
+          const alpha = Math.max(0, particle.life / particle.maxLife);
+          targetCtx.fillStyle = `${particle.color}${alpha})`;
+          targetCtx.beginPath();
+          targetCtx.arc(particle.x, particle.y, particle.size, 0, Math.PI * 2);
+          targetCtx.fill();
+        });
+        targetCtx.restore();
+      },
+
+      clear() {
+        this.particles = [];
+      }
+    };
+
     // =====================================================
     // 7. PHYSICS ENGINE
     // =====================================================
@@ -1575,6 +2589,7 @@
         AppState.fps = AppState.fps
           ? AppState.fps * 0.9 + instantFPS * 0.1
           : instantFPS;
+        PerformanceManager.updateFPS(AppState.fps, timestamp);
       }
       return AppState.lastDeltaTime;
     }
@@ -1644,6 +2659,9 @@
       if (EyeSliceManager && EyeSliceManager.slices.length) {
         EyeSliceManager.createMockSlices();
       }
+      if (typeof FaceShardManager !== "undefined") {
+        FaceShardManager.reset();
+      }
     }
 
     function clearCanvas() {
@@ -1652,8 +2670,47 @@
       ctx.fillRect(0, 0, AppState.canvasWidth, AppState.canvasHeight);
     }
 
+    function drawVisualAtmosphere(targetCtx, timestamp) {
+      const width = AppState.canvasWidth;
+      const height = AppState.canvasHeight;
+      targetCtx.save();
+      const glow = targetCtx.createRadialGradient(
+        width * 0.5,
+        height * 0.44,
+        Math.min(width, height) * 0.08,
+        width * 0.5,
+        height * 0.44,
+        Math.max(width, height) * 0.62
+      );
+      glow.addColorStop(0, "rgba(125, 249, 255, 0.05)");
+      glow.addColorStop(0.55, "rgba(255, 79, 216, 0.035)");
+      glow.addColorStop(1, "rgba(0, 0, 0, 0.28)");
+      targetCtx.fillStyle = glow;
+      targetCtx.fillRect(0, 0, width, height);
+
+      targetCtx.globalAlpha = PerformanceManager.effectiveMode === "low" ? 0.08 : 0.14;
+      targetCtx.fillStyle = "rgba(255, 255, 255, 0.55)";
+      const offset = Math.floor(timestamp * 0.04) % 18;
+      for (let y = offset; y < height; y += 18) {
+        targetCtx.fillRect(0, y, width, 1);
+      }
+
+      if (AppState.grayscaleEnabled && CONFIG.visualStyle.filmGrain > 0) {
+        targetCtx.globalAlpha = CONFIG.visualStyle.filmGrain;
+        targetCtx.fillStyle = "rgba(255, 255, 255, 0.42)";
+        const grainCount = PerformanceManager.effectiveMode === "low" ? 80 : 150;
+        for (let i = 0; i < grainCount; i += 1) {
+          const gx = (Math.sin(timestamp * 0.013 + i * 91.7) * 0.5 + 0.5) * width;
+          const gy = (Math.cos(timestamp * 0.017 + i * 57.3) * 0.5 + 0.5) * height;
+          targetCtx.fillRect(gx, gy, 1, 1);
+        }
+      }
+      targetCtx.restore();
+    }
+
     function render(timestamp, dt) {
       clearCanvas();
+
       const drewUploaded = SourceManager.drawUploadedMedia(ctx);
       let drewCamera = false;
 
@@ -1675,9 +2732,19 @@
         AppState.lastRenderLayers.push("fallback");
       }
       VisionEngine.update(timestamp);
+      FaceShardManager.update(dt);
       EyeSliceManager.update(dt);
+      ParticleManager.update(dt);
+      FaceShardManager.draw(ctx);
+      AppState.lastRenderLayers.push("face-shards");
       EyeSliceManager.draw(ctx);
       AppState.lastRenderLayers.push("slices");
+      ParticleManager.draw(ctx);
+      drawVisualAtmosphere(ctx, timestamp);
+      TarotCardManager.draw(ctx, timestamp);
+      AppState.lastRenderLayers.push("tarot");
+      TopEyePreview.draw(ctx);
+      AppState.lastRenderLayers.push("top-eye");
       drawFaceDebug(ctx);
       drawHandDebug(ctx);
     }
@@ -1704,7 +2771,7 @@
     function onPointerDown(event) {
       if (startOverlay && !startOverlay.classList.contains("hidden")) return;
       const point = getCanvasPoint(event);
-      const grabbed = EyeSliceManager.grabAt(point.x, point.y);
+      const grabbed = onPinchDown(point.x, point.y);
       if (!grabbed) return;
       AppState.pointerActive = true;
       AppState.activePointerId = event.pointerId;
@@ -1715,14 +2782,17 @@
     function onPointerMove(event) {
       if (!AppState.pointerActive || AppState.activePointerId !== event.pointerId) return;
       const point = getCanvasPoint(event);
-      EyeSliceManager.dragTo(point.x, point.y);
+      onPinchDrag(point.x, point.y);
       event.preventDefault();
     }
 
     function onPointerUp(event) {
       if (!AppState.pointerActive || AppState.activePointerId !== event.pointerId) return;
-      const velocity = EyeSliceManager.getReleaseVelocity();
-      EyeSliceManager.release(velocity.vx, velocity.vy);
+      let velocity = EyeSliceManager.getReleaseVelocity();
+      if (AppState.grabbedTarget === "face") {
+        velocity = FaceShardManager.getReleaseVelocity();
+      }
+      onPinchUp(velocity.vx, velocity.vy);
       AppState.pointerActive = false;
       AppState.activePointerId = null;
       if (canvas.hasPointerCapture(event.pointerId)) {
@@ -1740,9 +2810,14 @@
       AppState.startedAt = performance.now();
 
       await SourceManager.startCamera();
-      await VisionEngine.init({ hand: true, face: true });
+      VisionEngine.init({ hand: true, face: true }).catch((error) => {
+        const message = `识别模型后台加载失败：${error.message || "未知错误"}`;
+        AppState.errors.push(message);
+        showToast("识别模型加载较慢，已先进入可玩的基础模式。");
+      });
 
       setPhase("running");
+      showGuide();
       showToast("捏合手指抓住眼睛切片，拖动甩开；眨眼触发重组。");
       startBtn.textContent = "开始体验";
       startBtn.disabled = false;
@@ -1762,6 +2837,31 @@
       toggleDebugBtn.blur();
     });
 
+    recordModeBtn.addEventListener("click", () => {
+      setRecordingMode(!AppState.recordingMode);
+      recordModeBtn.blur();
+    });
+
+    recordExitBtn.addEventListener("click", () => {
+      setRecordingMode(false);
+      recordExitBtn.blur();
+    });
+
+    resetVisualBtn.addEventListener("click", () => {
+      resetVisualElements();
+      resetVisualBtn.blur();
+    });
+
+    grayscaleToggleBtn.addEventListener("click", () => {
+      CameraStylePipeline.setGrayscale(!AppState.grayscaleEnabled);
+      grayscaleToggleBtn.blur();
+    });
+
+    performanceModeBtn.addEventListener("click", () => {
+      PerformanceManager.cycleMode();
+      performanceModeBtn.blur();
+    });
+
     flipCameraBtn.addEventListener("click", async () => {
       flipCameraBtn.disabled = true;
       flipCameraBtn.textContent = "切换中...";
@@ -1779,6 +2879,19 @@
 
     window.addEventListener("resize", resizeCanvas);
     window.addEventListener("orientationchange", resizeCanvas);
+    window.addEventListener("keydown", (event) => {
+      if (event.repeat || event.target instanceof HTMLInputElement) return;
+      const key = event.key.toLowerCase();
+      if (key === "h") {
+        setUiHidden(!AppState.uiHidden);
+      } else if (key === "d") {
+        setDebugEnabled(!AppState.debug);
+      } else if (key === "r") {
+        resetVisualElements();
+      } else if (key === "escape" && AppState.recordingMode) {
+        setRecordingMode(false);
+      }
+    });
     canvas.addEventListener("pointerdown", onPointerDown);
     canvas.addEventListener("pointermove", onPointerMove);
     canvas.addEventListener("pointerup", onPointerUp);
@@ -1805,11 +2918,14 @@
         : "无";
 
       debugPanel.textContent = [
-        "眸影碎境 阶段 5",
+        "眸影碎境 阶段 8",
         `阶段: ${AppState.phase}`,
         `帧率: ${AppState.fps.toFixed(1)}`,
         `画布: ${AppState.canvasWidth} x ${AppState.canvasHeight}`,
         `DPR: ${AppState.dpr.toFixed(2)}`,
+        `性能模式: ${AppState.performanceMode}`,
+        `录屏模式: ${formatBool(AppState.recordingMode)}`,
+        `黑白滤镜: ${formatBool(AppState.grayscaleEnabled)}`,
         `界面隐藏: ${formatBool(AppState.uiHidden)}`,
         `输入模式: ${AppState.inputMode}`,
         `摄像头: ${formatBool(AppState.cameraReady)}`,
@@ -1820,11 +2936,18 @@
         `检测手数: ${AppState.detectedHands}`,
         `pinch 数: ${AppState.activePinches}`,
         `最近手势: ${AppState.lastPinchEvent}`,
+        `手掌姿态: ${AppState.lastHandPose}`,
         `脸部模型: ${formatBool(AppState.faceReady)}`,
         `检测脸数: ${AppState.detectedFaces}`,
         `眨眼状态: ${AppState.blinkState}`,
         `睁眼比例: ${AppState.eyeOpenRatio.toFixed(3)}`,
+        `眨眼连击: ${AppState.blinkComboCount}/${CONFIG.blinkCombo.requiredCount}`,
         `切片数量: ${EyeSliceManager.slices.length}`,
+        `脸部碎片: ${AppState.faceShardCount}`,
+        `碎片冻结: ${formatBool(AppState.faceShardsFrozen)}`,
+        `塔罗卡: ${TarotCardManager.cards[AppState.currentCardIndex]?.zh || "无"}`,
+        `结束态: ${formatBool(AppState.gameEnded)}`,
+        `粒子数量: ${ParticleManager.particles.length}`,
         `正在抓取: ${formatBool(Boolean(EyeSliceManager.grabbedSlice))}`,
         `运行: ${uptime}s`,
         `最近错误: ${latestError}`
@@ -1833,6 +2956,8 @@
 
     resizeCanvas();
     EyeSliceManager.init();
+    CameraStylePipeline.setGrayscale(CONFIG.visualStyle.grayscaleEnabled);
+    TarotCardManager.reset();
     setPhase("ready");
     requestAnimationFrame(animationLoop);
   </script>

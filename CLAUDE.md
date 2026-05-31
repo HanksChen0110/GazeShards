@@ -6,7 +6,37 @@ Build GazeShards as a staged Web AR interaction MVP. The MVP target is a single-
 
 ## Current Stage
 
-Stage 0, Stage 1, Stage 2, Stage 3, Stage 4, and Stage 5 have passed. Next implementation work is Stage 6 only.
+Stage 0, Stage 1, Stage 2, Stage 3, Stage 4, Stage 5, Stage 6, Stage 7, and Stage 8 have passed. Next implementation work is Stage 9 only after an explicit request.
+
+Stage 8 is V0.3 art upgrade:
+- Fixed top eye preview that does not move with draggable shards
+- Square face-region shards using eye, brow, nose, mouth, cheek, forehead, and small face regions
+- Default grayscale camera background with blur and film grain
+- Clear grayscale shard crops over the blurred background
+- Settings toggle for grayscale camera styling
+- Colored tarot card layer that is not affected by grayscale styling
+- Open-palm gesture switches to the next tarot card with cooldown
+- Three valid blinks summon The Fool card and enter an end state
+- Stage 8 report after verification
+
+Transparent cloth mode is deferred to a later stage after Stage 8.
+
+Stage 7 includes:
+- `FaceShardManager`
+- Face-region shards from forehead, nose, mouth, cheeks, and small random regions
+- Blink-triggered face shard reassembly
+- Face proximity scatter/reassemble response
+- Pinch or pointer grab for face shards
+- Stage 7 report after verification
+
+Stage 6 includes:
+- Performance manager with auto/high/low modes
+- Low-performance detection interval and particle cap
+- Recording mode
+- Keyboard shortcuts: `H`, `D`, `R`, and `Esc`
+- Friendlier first-use guidance
+- UI polish and mobile touch target improvements
+- Stage 6 report after verification
 
 Stage 5 includes:
 - MVP integration and acceptance
@@ -31,8 +61,6 @@ Stage 5 already includes:
 - Uploaded image/video rendering as a background layer while camera remains visible
 - Explicit debug toggle control
 - Stage 5 MVP report after verification
-
-Stage 6 does not start until a new request explicitly asks for it.
 
 Stage 4 already includes:
 - FaceTracker integration for MediaPipe Tasks Vision

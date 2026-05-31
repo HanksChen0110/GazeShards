@@ -1,4 +1,4 @@
-# GazeShards Project Rules
+﻿# GazeShards Project Rules
 
 ## Project Goal
 
@@ -6,7 +6,7 @@ Build GazeShards as a staged Web AR interaction MVP. The MVP target is a single-
 
 ## Current Stage
 
-Stage 0, Stage 1, Stage 2, Stage 3, Stage 4, Stage 5, Stage 6, Stage 7, and Stage 8 have passed. Next implementation work is Stage 9 only after an explicit request.
+Stage 0, Stage 1, Stage 2, Stage 3, Stage 4, Stage 5, Stage 6, Stage 7, Stage 8, and Stage 9 have passed. Next implementation work is Stage 10 only after an explicit request.
 
 Stage 8 is V0.3 art upgrade:
 - Fixed top eye preview that does not move with draggable shards

@@ -8,13 +8,17 @@
   <style>
     :root {
       color-scheme: dark;
-      --panel-bg: rgba(8, 10, 14, 0.76);
-      --panel-border: rgba(255, 255, 255, 0.14);
+      --panel-bg: rgba(3, 7, 12, 0.72);
+      --panel-border: rgba(195, 158, 94, 0.42);
       --text: rgba(255, 255, 255, 0.92);
       --muted: rgba(255, 255, 255, 0.58);
       --accent: #7df9ff;
-      --accent-strong: #ff4fd8;
-      --accent-warm: #f8ff96;
+      --accent-strong: #c39e5e;
+      --accent-warm: #e5c06f;
+      --brass: #c39e5e;
+      --brass-dim: rgba(195, 158, 94, 0.34);
+      --silver-blue: #9fd8ff;
+      --obsidian: rgba(3, 7, 12, 0.72);
       --shadow: rgba(0, 0, 0, 0.34);
     }
 
@@ -28,9 +32,9 @@
       height: 100%;
       margin: 0;
       overflow: hidden;
-      background: #000;
+      background: #020508;
       color: var(--text);
-      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      font-family: Georgia, "Times New Roman", "Noto Serif SC", "Microsoft YaHei", serif;
       letter-spacing: 0;
     }
 
@@ -51,7 +55,27 @@
       height: 100vh;
       display: block;
       touch-action: none;
-      background: #000;
+      background: #020508;
+    }
+
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      z-index: 1;
+      pointer-events: none;
+      border: 1px solid rgba(195, 158, 94, 0.58);
+      box-shadow: inset 0 0 38px rgba(159, 216, 255, 0.12);
+    }
+
+    body::after {
+      content: "";
+      position: fixed;
+      inset: 14px;
+      z-index: 1;
+      pointer-events: none;
+      border: 1px solid rgba(159, 216, 255, 0.16);
+      box-shadow: inset 0 0 80px rgba(3, 7, 12, 0.82);
     }
 
     #startOverlay {
@@ -61,11 +85,47 @@
       display: grid;
       place-items: center;
       padding: 24px;
+      overflow: hidden;
+      background: rgba(3, 7, 12, 0.18);
+      backdrop-filter: blur(12px) saturate(0.68);
+      transition: opacity 260ms ease, visibility 260ms ease;
+    }
+
+    #startOverlay::before,
+    #startOverlay::after {
+      content: "";
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      width: 52%;
+      pointer-events: none;
       background:
-        radial-gradient(circle at 52% 42%, rgba(125, 249, 255, 0.12), transparent 26%),
-        radial-gradient(circle at 42% 58%, rgba(255, 79, 216, 0.10), transparent 24%),
-        rgba(0, 0, 0, 0.72);
-      transition: opacity 180ms ease, visibility 180ms ease;
+        linear-gradient(90deg, rgba(255, 255, 255, 0.10), rgba(255, 255, 255, 0.02)),
+        repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.08) 0 1px, transparent 1px 13px),
+        rgba(5, 9, 13, 0.46);
+      box-shadow: inset 0 0 88px rgba(159, 216, 255, 0.18);
+      transition: transform 760ms cubic-bezier(0.72, 0.02, 0.18, 1), opacity 760ms ease;
+    }
+
+    #startOverlay::before {
+      left: 0;
+      border-right: 1px solid rgba(229, 192, 111, 0.42);
+    }
+
+    #startOverlay::after {
+      right: 0;
+      transform: scaleX(-1);
+      border-left: 1px solid rgba(229, 192, 111, 0.42);
+    }
+
+    #startOverlay.is-opening::before {
+      transform: translateX(-102%);
+      opacity: 0.24;
+    }
+
+    #startOverlay.is-opening::after {
+      transform: translateX(102%) scaleX(-1);
+      opacity: 0.24;
     }
 
     #startOverlay.hidden {
@@ -80,6 +140,14 @@
       gap: 16px;
       justify-items: center;
       text-align: center;
+      position: relative;
+      z-index: 1;
+      transition: opacity 420ms ease, transform 420ms ease;
+    }
+
+    #startOverlay.is-opening .startPanel {
+      opacity: 0;
+      transform: translateY(-18px);
     }
 
     .startPanel h1 {
@@ -102,18 +170,18 @@
     .fileControl {
       min-height: 42px;
       border: 1px solid var(--panel-border);
-      border-radius: 8px;
+      border-radius: 4px;
       color: var(--text);
-      background: rgba(255, 255, 255, 0.08);
-      box-shadow: 0 12px 30px var(--shadow);
+      background: linear-gradient(180deg, rgba(9, 16, 23, 0.82), rgba(2, 5, 9, 0.72));
+      box-shadow: 0 12px 30px var(--shadow), inset 0 0 18px rgba(159, 216, 255, 0.06);
     }
 
     .primaryButton {
       min-width: 184px;
       padding: 0 22px;
-      color: #061114;
-      background: linear-gradient(135deg, var(--accent), #f8ff96);
-      border: 0;
+      color: #06090b;
+      background: linear-gradient(135deg, var(--silver-blue), var(--brass));
+      border: 1px solid rgba(229, 192, 111, 0.72);
       font-weight: 760;
       cursor: pointer;
     }
@@ -123,6 +191,13 @@
       padding: 0 14px;
       cursor: pointer;
       backdrop-filter: blur(14px);
+      transition: border-color 160ms ease, box-shadow 160ms ease, color 160ms ease, background 160ms ease;
+    }
+
+    .controlButton:hover,
+    .fileControl:hover {
+      border-color: rgba(159, 216, 255, 0.78);
+      box-shadow: 0 0 18px rgba(159, 216, 255, 0.18), inset 0 0 18px rgba(159, 216, 255, 0.08);
     }
 
     .controlButton:disabled,
@@ -139,18 +214,19 @@
 
     #controls {
       position: fixed;
-      right: max(16px, env(safe-area-inset-right));
-      bottom: max(16px, env(safe-area-inset-bottom));
+      right: max(18px, env(safe-area-inset-right));
+      bottom: max(18px, env(safe-area-inset-bottom));
       z-index: 10;
       display: flex;
       flex-wrap: wrap;
       justify-content: flex-end;
       gap: 10px;
-      max-width: min(520px, calc(100vw - 32px));
+      max-width: min(360px, calc(100vw - 32px));
       padding: 10px;
       border: 1px solid var(--panel-border);
-      border-radius: 8px;
-      background: var(--panel-bg);
+      border-radius: 4px;
+      background: linear-gradient(180deg, rgba(5, 10, 16, 0.78), rgba(1, 3, 6, 0.72));
+      box-shadow: inset 0 0 24px rgba(159, 216, 255, 0.06), 0 18px 44px rgba(0, 0, 0, 0.42);
       backdrop-filter: blur(18px);
       transition: background 160ms ease, border-color 160ms ease;
     }
@@ -170,6 +246,25 @@
     body.recording-mode #toast,
     body.recording-mode #guidePanel {
       display: none;
+    }
+
+    #restartBtn {
+      position: fixed;
+      left: 50%;
+      bottom: max(34px, calc(env(safe-area-inset-bottom) + 34px));
+      z-index: 17;
+      min-width: 148px;
+      transform: translateX(-50%) translateY(16px);
+      opacity: 0;
+      pointer-events: none;
+      border-color: rgba(229, 192, 111, 0.82);
+      color: rgba(245, 238, 220, 0.94);
+    }
+
+    #restartBtn.visible {
+      opacity: 1;
+      pointer-events: auto;
+      transform: translateX(-50%) translateY(0);
     }
 
     #recordExitBtn {
@@ -242,20 +337,21 @@
 
     #debugPanel {
       position: fixed;
-      top: max(16px, env(safe-area-inset-top));
-      right: max(16px, env(safe-area-inset-right));
+      top: max(76px, calc(env(safe-area-inset-top) + 76px));
+      right: max(18px, env(safe-area-inset-right));
       z-index: 10;
-      min-width: 230px;
+      min-width: 260px;
       max-width: calc(100vw - 32px);
       padding: 12px;
       border: 1px solid var(--panel-border);
-      border-radius: 8px;
-      background: var(--panel-bg);
+      border-radius: 4px;
+      background: linear-gradient(180deg, rgba(5, 10, 16, 0.76), rgba(1, 3, 6, 0.68));
       color: var(--text);
       font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
       font-size: 12px;
       line-height: 1.55;
       white-space: pre-line;
+      box-shadow: inset 0 0 30px rgba(159, 216, 255, 0.08), 0 18px 54px rgba(0, 0, 0, 0.44);
       backdrop-filter: blur(18px);
       overflow: auto;
     }
@@ -337,12 +433,13 @@
 <body>
   <canvas id="mainCanvas"></canvas>
   <button id="recordExitBtn" class="controlButton" type="button" title="退出录屏模式">×</button>
+  <button id="restartBtn" class="controlButton" type="button">重新开始</button>
 
   <div id="startOverlay">
     <div class="startPanel">
       <h1>眸影碎境</h1>
-      <p>授权摄像头后，用拇指和食指捏合抓住眼睛切片，拖动甩开；眨眼会触发重组效果。</p>
-      <button id="startBtn" class="primaryButton" type="button">开始体验</button>
+      <p>揭开这个世界，用脸部碎片唤醒左侧塔罗牌；三次眨眼仍会召唤愚者。</p>
+      <button id="startBtn" class="primaryButton" type="button">揭开这个世界</button>
     </div>
   </div>
 
@@ -361,7 +458,7 @@
   </div>
 
   <div id="debugPanel"></div>
-  <div id="guidePanel" class="hidden">捏合抓住眼睛或脸部碎片，拖动甩开；眨眼会重组画面。按 H 隐藏界面，D 切换调试，R 重置。</div>
+  <div id="guidePanel" class="hidden">捏合或拖动脸部碎片，把它送入左侧塔罗槽并停留片刻。张掌切换待揭示牌，三次眨眼召唤愚者。</div>
   <div id="toast" role="status" aria-live="polite"></div>
 
   <script>
@@ -401,18 +498,20 @@
 
       topEyePreview: {
         enabled: true,
-        widthRatio: 0.34,
-        maxWidth: 320,
-        minWidth: 168,
-        aspectRatio: 2.6,
-        top: 18
+        widthRatio: 0.22,
+        maxWidth: 220,
+        minWidth: 132,
+        aspectRatio: 2.35,
+        top: 22
       },
 
       tarotDeck: {
         enabled: true,
         currentIndex: 0,
         switchCooldownMs: 900,
-        summonDurationMs: 1800
+        summonDurationMs: 1800,
+        revealDurationMs: 1150,
+        revealHoldMs: 800
       },
 
       blinkCombo: {
@@ -421,9 +520,9 @@
       },
 
       eyeSlices: {
-        initialCount: 8,
-        minScale: 1.2,
-        maxScale: 2.8,
+        initialCount: 9,
+        minScale: 0.82,
+        maxScale: 1.42,
         friction: 0.94,
         throwMultiplier: 1.0,
         maxSpeed: 40,
@@ -443,7 +542,7 @@
       },
 
       faceShards: {
-        maxCount: 14,
+        maxCount: 16,
         friction: 0.92,
         scatterForce: 10,
         grabRadius: 140,
@@ -471,6 +570,7 @@
     const debugPanel = document.getElementById("debugPanel");
     const guidePanel = document.getElementById("guidePanel");
     const recordExitBtn = document.getElementById("recordExitBtn");
+    const restartBtn = document.getElementById("restartBtn");
     const toast = document.getElementById("toast");
 
     // =====================================================
@@ -520,11 +620,22 @@
       lastHandPose: "none",
       currentCardId: "fool",
       currentCardIndex: 0,
+      cardState: "faceDown",
+      tarotAssetsReady: false,
+      tarotAssetsFailed: false,
       lastOpenPalmTime: 0,
       blinkComboCount: 0,
       gameEnded: false,
+      screenFlash: 0,
 
       errors: []
+    };
+
+    const RitualState = {
+      selectedShardId: null,
+      hoverStartAt: 0,
+      targetCardId: "fool",
+      revealStartedAt: 0
     };
 
     // =====================================================
@@ -943,6 +1054,7 @@
         const rightRatio = BlinkDetector.computeEyeOpenRatio(landmarks, RIGHT_EYE_RATIO);
         const ratio = Math.min(leftRatio, rightRatio);
         BlinkDetector.update(ratio, timestamp);
+        FaceRegionSampler.update(this.lastFaceBox, this.lastEyeRects);
         EyeSliceManager.updateEyeRects(this.lastEyeRects);
         TopEyePreview.updateFromEyeRects(this.lastEyeRects);
         FaceShardManager.updateFromFaceBox(this.lastFaceBox);
@@ -1009,6 +1121,50 @@
       }
     };
 
+
+    const FaceRegionSampler = {
+      regions: [],
+
+      update(faceRect, eyeRects = []) {
+        if (!faceRect) return;
+        const candidates = [];
+        eyeRects.forEach((rect) => {
+          candidates.push({ ...rect, kind: rect.side === "left" ? "left-eye" : "right-eye", weight: 1.0 });
+        });
+        const specs = [
+          { kind: "brow", x: 0.34, y: 0.20, w: 0.34, h: 0.16 },
+          { kind: "nose", x: 0.50, y: 0.46, w: 0.22, h: 0.24 },
+          { kind: "mouth", x: 0.50, y: 0.72, w: 0.34, h: 0.18 },
+          { kind: "left-cheek", x: 0.28, y: 0.54, w: 0.26, h: 0.24 },
+          { kind: "right-cheek", x: 0.70, y: 0.54, w: 0.26, h: 0.24 },
+          { kind: "forehead", x: 0.50, y: 0.10, w: 0.34, h: 0.18 },
+          { kind: "jaw", x: 0.50, y: 0.86, w: 0.30, h: 0.18 }
+        ];
+        specs.forEach((spec) => candidates.push(this.rectFromSpec(faceRect, spec)));
+        this.regions = candidates.filter(Boolean);
+      },
+
+      rectFromSpec(faceRect, spec) {
+        const w = Math.max(4, faceRect.w * spec.w);
+        const h = Math.max(4, faceRect.h * spec.h);
+        return {
+          x: Math.max(0, faceRect.x + faceRect.w * spec.x - w * 0.5),
+          y: Math.max(0, faceRect.y + faceRect.h * spec.y - h * 0.5),
+          w,
+          h,
+          side: spec.kind,
+          kind: spec.kind,
+          weight: 0.8
+        };
+      },
+
+      getRegion(index, fallbackRects = []) {
+        const pool = this.regions.length ? this.regions : fallbackRects;
+        if (!pool || !pool.length) return null;
+        return pool[index % pool.length];
+      }
+    };
+
     const BlinkDetector = {
       lastBlinkTime: 0,
       wasClosed: false,
@@ -1030,6 +1186,7 @@
             AppState.lastBlinkTime = now;
             EyeSliceManager.triggerBlinkEffect();
             FaceShardManager.triggerReassemble();
+            MysticEffectManager.blink(now);
             TarotCardManager.registerBlink(now);
             return true;
           }
@@ -1233,10 +1390,14 @@
     function resetVisualElements() {
       AppState.gameEnded = false;
       AppState.blinkComboCount = 0;
+      AppState.screenFlash = 0;
+      restartBtn.classList.remove("visible");
       EyeSliceManager.createMockSlices();
       FaceShardManager.reset();
       TarotCardManager.reset();
+      CardRevealController.reset();
       ParticleManager.clear();
+      MysticEffectManager.clear();
       showToast("视觉元素已重置。");
     }
 
@@ -1260,6 +1421,7 @@
     function onPinchDown(x, y) {
       if (AppState.gameEnded) return false;
       AppState.lastPinchEvent = "PINCH_DOWN";
+      MysticEffectManager.pinchDown(x, y);
       if (EyeSliceManager.grabAt(x, y)) {
         AppState.grabbedTarget = "eye";
         return true;
@@ -1274,6 +1436,7 @@
 
     function onPinchDrag(x, y) {
       AppState.lastPinchEvent = "PINCH_DRAG";
+      MysticEffectManager.pinchDrag(x, y);
       if (AppState.grabbedTarget === "face") {
         return FaceShardManager.dragTo(x, y);
       }
@@ -1282,12 +1445,14 @@
 
     function onPinchUp(vx, vy) {
       AppState.lastPinchEvent = "PINCH_UP";
+      MysticEffectManager.pinchUp(vx, vy);
       let released = false;
       if (AppState.grabbedTarget === "face") {
         released = FaceShardManager.release(vx, vy);
       } else {
         released = EyeSliceManager.release(vx, vy);
       }
+      CardRevealController.resetHover();
       AppState.grabbedTarget = null;
       return released;
     }
@@ -1341,6 +1506,7 @@
         if (timestamp - AppState.lastOpenPalmTime < CONFIG.tarotDeck.switchCooldownMs) return false;
         AppState.lastOpenPalmTime = timestamp;
         FaceShardManager.triggerScatter(0.45);
+        MysticEffectManager.openPalm(timestamp);
         TarotCardManager.nextCard(timestamp);
         return true;
       }
@@ -1599,23 +1765,15 @@
 
       updateFromEyeRects(eyeRects) {
         if (!eyeRects || !eyeRects.length) return;
-        if (eyeRects.length === 1) {
-          this.lastRect = eyeRects[0];
-          this.sourceRect = this.lastRect;
-          return;
-        }
-        const minX = Math.min(...eyeRects.map((rect) => rect.x));
-        const minY = Math.min(...eyeRects.map((rect) => rect.y));
-        const maxX = Math.max(...eyeRects.map((rect) => rect.x + rect.w));
-        const maxY = Math.max(...eyeRects.map((rect) => rect.y + rect.h));
-        const w = maxX - minX;
-        const h = maxY - minY;
+        const preferred = eyeRects.find((rect) => rect.side === "left") || eyeRects[0];
+        const padX = preferred.w * 0.18;
+        const padY = preferred.h * 0.55;
         this.lastRect = {
-          x: Math.max(0, minX - w * 0.12),
-          y: Math.max(0, minY - h * 0.6),
-          w: w * 1.24,
-          h: h * 2.2,
-          side: "both"
+          x: Math.max(0, preferred.x - padX),
+          y: Math.max(0, preferred.y - padY),
+          w: preferred.w + padX * 2,
+          h: preferred.h + padY * 2,
+          side: preferred.side
         };
         this.sourceRect = this.lastRect;
       },
@@ -1633,54 +1791,17 @@
           ? CameraStylePipeline.getClearSource(SourceManager.videoEl)
           : null;
 
-        targetCtx.save();
-        targetCtx.shadowColor = "rgba(0, 0, 0, 0.52)";
-        targetCtx.shadowBlur = 22;
-        targetCtx.fillStyle = "rgba(4, 6, 8, 0.72)";
-        targetCtx.fillRect(x, y, width, height);
-
-        if (sourceMedia && this.lastRect) {
-          try {
-            targetCtx.drawImage(
-              sourceMedia,
-              this.lastRect.x,
-              this.lastRect.y,
-              this.lastRect.w,
-              this.lastRect.h,
-              x,
-              y,
-              width,
-              height
-            );
-          } catch (error) {
-            this.drawPlaceholder(targetCtx, x, y, width, height);
+        drawObservatoryFrame(targetCtx, x, y, width, height, () => {
+          if (sourceMedia && this.lastRect) {
+            try {
+              targetCtx.drawImage(sourceMedia, this.lastRect.x, this.lastRect.y, this.lastRect.w, this.lastRect.h, x + 10, y + 8, width - 20, height - 16);
+            } catch (error) {
+              this.drawPlaceholder(targetCtx, x + 10, y + 8, width - 20, height - 16);
+            }
+          } else {
+            this.drawPlaceholder(targetCtx, x + 10, y + 8, width - 20, height - 16);
           }
-        } else {
-          this.drawPlaceholder(targetCtx, x, y, width, height);
-        }
-
-        targetCtx.shadowColor = "transparent";
-        targetCtx.strokeStyle = "rgba(255, 255, 255, 0.84)";
-        targetCtx.lineWidth = 1.5;
-        targetCtx.strokeRect(x, y, width, height);
-        targetCtx.strokeStyle = "rgba(0, 0, 0, 0.85)";
-        const corner = Math.min(24, height * 0.36);
-        targetCtx.lineWidth = 4;
-        targetCtx.beginPath();
-        targetCtx.moveTo(x, y + corner);
-        targetCtx.lineTo(x, y);
-        targetCtx.lineTo(x + corner, y);
-        targetCtx.moveTo(x + width - corner, y);
-        targetCtx.lineTo(x + width, y);
-        targetCtx.lineTo(x + width, y + corner);
-        targetCtx.moveTo(x + width, y + height - corner);
-        targetCtx.lineTo(x + width, y + height);
-        targetCtx.lineTo(x + width - corner, y + height);
-        targetCtx.moveTo(x + corner, y + height);
-        targetCtx.lineTo(x, y + height);
-        targetCtx.lineTo(x, y + height - corner);
-        targetCtx.stroke();
-        targetCtx.restore();
+        });
       },
 
       drawPlaceholder(targetCtx, x, y, width, height) {
@@ -1696,30 +1817,85 @@
 
     const TarotCardManager = {
       cards: [
-        { id: "fool", zh: "愚者", en: "THE FOOL", colors: ["#5b3fd6", "#f6d36c"], mark: "0" },
-        { id: "justice", zh: "正义", en: "JUSTICE", colors: ["#194f7a", "#f0f3ff"], mark: "XI" },
-        { id: "hanged", zh: "倒吊人", en: "THE HANGED MAN", colors: ["#30323f", "#d95f50"], mark: "XII" },
-        { id: "sun", zh: "太阳", en: "THE SUN", colors: ["#f6b13d", "#fff0a8"], mark: "XIX" },
-        { id: "magician", zh: "魔术师", en: "THE MAGICIAN", colors: ["#7c2438", "#f4d3a1"], mark: "I" },
-        { id: "hermit", zh: "隐者", en: "THE HERMIT", colors: ["#1f5a54", "#d6f0d8"], mark: "IX" },
-        { id: "star", zh: "星星", en: "THE STAR", colors: ["#173a8a", "#9fd4ff"], mark: "XVII" },
-        { id: "moon", zh: "月亮", en: "THE MOON", colors: ["#32205f", "#d9c6ff"], mark: "XVIII" }
+        { id: "fool", zh: "愚者", en: "THE FOOL", imageSrc: "assets/thefool_character.png", fallbackColors: ["#5b3fd6", "#f6d36c"], mark: "0" },
+        { id: "justice", zh: "正义", en: "JUSTICE", imageSrc: "assets/justice_character.png", fallbackColors: ["#194f7a", "#f0f3ff"], mark: "XI" },
+        { id: "hanged", zh: "倒吊人", en: "THE HANGED MAN", imageSrc: "assets/thehangedman_character.png", fallbackColors: ["#30323f", "#d95f50"], mark: "XII" },
+        { id: "sun", zh: "太阳", en: "THE SUN", imageSrc: "assets/sun_character.png", fallbackColors: ["#f6b13d", "#fff0a8"], mark: "XIX" },
+        { id: "magician", zh: "魔术师", en: "THE MAGICIAN", imageSrc: "assets/themagician_character.png", fallbackColors: ["#7c2438", "#f4d3a1"], mark: "I" },
+        { id: "hermit", zh: "隐者", en: "THE HERMIT", imageSrc: "assets/thehermit_character.png", fallbackColors: ["#1f5a54", "#d6f0d8"], mark: "IX" },
+        { id: "star", zh: "星星", en: "THE STAR", imageSrc: "assets/star__character.png", fallbackColors: ["#173a8a", "#9fd4ff"], mark: "XVII" },
+        { id: "moon", zh: "月亮", en: "THE MOON", imageSrc: "assets/moon_character.png", fallbackColors: ["#32205f", "#d9c6ff"], mark: "XVIII" }
       ],
+      backImageSrc: "assets/card_back.png",
+      assetImages: new Map(),
+      assetLoadPromise: null,
+      assetsReady: false,
+      assetsFailed: false,
+      cardState: "faceDown", // faceDown | revealing | revealed | summoned
       lastComboBlinkTime: 0,
       lastSwitchTime: 0,
       summonStartedAt: 0,
+      revealStartedAt: 0,
 
       reset() {
         this.lastComboBlinkTime = 0;
         this.summonStartedAt = 0;
+        this.revealStartedAt = 0;
+        this.cardState = "faceDown";
+        AppState.cardState = this.cardState;
+        RitualState.hoverStartAt = 0;
+        RitualState.selectedShardId = null;
+        RitualState.revealStartedAt = 0;
         this.setCurrent(CONFIG.tarotDeck.currentIndex || 0);
       },
 
-      setCurrent(index) {
+      preloadTarotAssets() {
+        if (this.assetLoadPromise) return this.assetLoadPromise;
+        const sources = [this.backImageSrc, ...this.cards.map((card) => card.imageSrc)];
+        this.assetLoadPromise = Promise.all(sources.map((src) => new Promise((resolve) => {
+          const image = new Image();
+          image.onload = () => {
+            this.assetImages.set(src, image);
+            resolve({ src, ok: true });
+          };
+          image.onerror = () => {
+            const message = `塔罗资产加载失败：${src}`;
+            AppState.errors.push(message);
+            resolve({ src, ok: false });
+          };
+          image.src = src;
+        }))).then((results) => {
+          this.assetsFailed = results.some((result) => !result.ok);
+          this.assetsReady = !this.assetsFailed;
+          AppState.tarotAssetsReady = this.assetsReady;
+          AppState.tarotAssetsFailed = this.assetsFailed;
+          if (this.assetsFailed) {
+            showToast("塔罗图片加载不完整，已回退到程序化卡牌。");
+          }
+          return this.assetsReady;
+        }).catch((error) => {
+          this.assetsFailed = true;
+          this.assetsReady = false;
+          AppState.tarotAssetsReady = false;
+          AppState.tarotAssetsFailed = true;
+          AppState.errors.push(`塔罗资产预加载中断：${error.message || "未知错误"}`);
+          return false;
+        });
+        return this.assetLoadPromise;
+      },
+
+      setCurrent(index, options = {}) {
         const nextIndex = ((index % this.cards.length) + this.cards.length) % this.cards.length;
         CONFIG.tarotDeck.currentIndex = nextIndex;
         AppState.currentCardIndex = nextIndex;
         AppState.currentCardId = this.cards[nextIndex].id;
+        RitualState.targetCardId = AppState.currentCardId;
+        if (!options.keepState) {
+          this.cardState = "faceDown";
+          this.revealStartedAt = 0;
+          AppState.cardState = this.cardState;
+          RitualState.revealStartedAt = 0;
+        }
       },
 
       nextCard(timestamp = performance.now()) {
@@ -1727,7 +1903,8 @@
         if (timestamp - this.lastSwitchTime < CONFIG.tarotDeck.switchCooldownMs) return;
         this.lastSwitchTime = timestamp;
         this.setCurrent(AppState.currentCardIndex + 1);
-        showToast(`塔罗切换：${this.cards[AppState.currentCardIndex].zh}`);
+        CardRevealController.reset();
+        showToast(`待揭示牌：${this.cards[AppState.currentCardIndex].zh}`);
       },
 
       registerBlink(timestamp = performance.now()) {
@@ -1743,53 +1920,174 @@
       },
 
       summonFool(timestamp = performance.now()) {
-        this.setCurrent(0);
+        this.setCurrent(0, { keepState: true });
+        this.cardState = "summoned";
+        AppState.cardState = this.cardState;
         AppState.gameEnded = true;
         AppState.blinkComboCount = CONFIG.blinkCombo.requiredCount;
         this.summonStartedAt = timestamp;
         FaceShardManager.triggerFreeze();
+        MysticEffectManager.tripleBlink(timestamp);
+        restartBtn.classList.add("visible");
         ParticleManager.emit(AppState.canvasWidth * 0.5, AppState.canvasHeight * 0.5, 42, "face");
         showToast("愚者已被召唤。");
+      },
+
+      startReveal(timestamp = performance.now()) {
+        if (AppState.gameEnded || this.cardState !== "faceDown") return false;
+        this.cardState = "revealing";
+        this.revealStartedAt = timestamp;
+        AppState.cardState = this.cardState;
+        RitualState.revealStartedAt = timestamp;
+        MysticEffectManager.openPalm(timestamp);
+        ParticleManager.emit(AppState.canvasWidth * 0.115, AppState.canvasHeight * 0.56, 24, "face");
+        showToast(`揭示：${this.cards[AppState.currentCardIndex].zh}`);
+        return true;
+      },
+
+      update(timestamp = performance.now()) {
+        if (this.cardState !== "revealing") return;
+        if (timestamp - this.revealStartedAt >= CONFIG.tarotDeck.revealDurationMs) {
+          this.cardState = "revealed";
+          AppState.cardState = this.cardState;
+          CardRevealController.reset();
+        }
+      },
+
+      getRevealProgress(timestamp = performance.now()) {
+        if (this.cardState === "revealed" || this.cardState === "summoned") return 1;
+        if (this.cardState !== "revealing") return 0;
+        return easeOutCubic((timestamp - this.revealStartedAt) / CONFIG.tarotDeck.revealDurationMs);
+      },
+
+      getLayout() {
+        const cardRatio = 1920 / 1088;
+        const baseW = AppState.gameEnded
+          ? Math.min(310, AppState.canvasWidth * 0.42, AppState.canvasHeight * 0.34)
+          : Math.min(178, Math.max(108, AppState.canvasWidth * 0.13));
+        const w = baseW;
+        const h = w * cardRatio;
+        const x = AppState.gameEnded
+          ? AppState.canvasWidth * 0.5
+          : Math.max(42 + w * 0.5, AppState.canvasWidth * 0.115);
+        const y = AppState.gameEnded
+          ? AppState.canvasHeight * 0.52
+          : AppState.canvasHeight * 0.56;
+        return { x, y, w, h, rect: { x: x - w / 2, y: y - h / 2, w, h } };
       },
 
       draw(targetCtx, timestamp) {
         if (!CONFIG.tarotDeck.enabled) return;
         const card = this.cards[AppState.currentCardIndex] || this.cards[0];
-        const baseW = AppState.gameEnded
-          ? Math.min(300, AppState.canvasWidth * 0.44)
-          : Math.min(156, Math.max(104, AppState.canvasWidth * 0.15));
-        const w = baseW;
-        const h = w * 1.56;
+        const layout = this.getLayout();
+        const w = layout.w;
+        const h = layout.h;
         const pulse = AppState.gameEnded ? Math.sin(timestamp * 0.006) * 0.025 + 1.08 : 1;
-        const x = AppState.gameEnded
-          ? AppState.canvasWidth * 0.5
-          : Math.max(18 + w * 0.5, AppState.canvasWidth * 0.12);
-        const y = AppState.gameEnded
-          ? AppState.canvasHeight * 0.52
-          : AppState.canvasHeight * 0.58;
-        this.drawCard(targetCtx, card, x, y, w * pulse, h * pulse, AppState.gameEnded);
+        CardRevealController.slotRect = layout.rect;
+        drawSummoningSlot(targetCtx, layout.x, layout.y, w, h, timestamp, AppState.gameEnded);
+        this.drawCard(targetCtx, card, layout.x, layout.y, w * pulse, h * pulse, timestamp);
       },
 
-      drawCard(targetCtx, card, x, y, w, h, summoned) {
+      drawCard(targetCtx, card, x, y, w, h, timestamp) {
+        const state = AppState.gameEnded ? "summoned" : this.cardState;
+        const summoned = state === "summoned";
+        const colors = card.fallbackColors || ["#5b3fd6", "#f6d36c"];
         targetCtx.save();
         targetCtx.translate(x, y);
-        targetCtx.shadowColor = `${card.colors[0]}aa`;
-        targetCtx.shadowBlur = summoned ? 42 : 20;
+        const revealProgress = this.getRevealProgress(timestamp);
+        const breathe = state === "faceDown" ? 1 + Math.sin(timestamp * 0.0024) * 0.012 : 1;
+        targetCtx.scale(breathe, breathe);
+        targetCtx.shadowColor = summoned ? "rgba(229, 192, 111, 0.72)" : `${colors[0]}aa`;
+        targetCtx.shadowBlur = summoned ? 42 : state === "faceDown" ? 28 : 20;
         targetCtx.fillStyle = "#111";
         targetCtx.fillRect(-w / 2, -h / 2, w, h);
 
+        if (state === "faceDown") {
+          this.drawBack(targetCtx, w, h, timestamp);
+        } else if (state === "revealing") {
+          this.drawBack(targetCtx, w, h, timestamp);
+          targetCtx.save();
+          targetCtx.beginPath();
+          targetCtx.rect(-w / 2, -h / 2, w, h * revealProgress);
+          targetCtx.clip();
+          this.drawFront(targetCtx, card, w, h, summoned);
+          targetCtx.restore();
+
+          const curtainY = -h / 2 + h * revealProgress;
+          targetCtx.shadowColor = "rgba(255, 255, 255, 0.78)";
+          targetCtx.shadowBlur = 18;
+          targetCtx.strokeStyle = "rgba(255, 255, 255, 0.84)";
+          targetCtx.lineWidth = 2;
+          targetCtx.beginPath();
+          targetCtx.moveTo(-w / 2 + 8, curtainY);
+          targetCtx.lineTo(w / 2 - 8, curtainY);
+          targetCtx.stroke();
+        } else {
+          this.drawFront(targetCtx, card, w, h, summoned);
+        }
+
+        targetCtx.shadowColor = "transparent";
+        targetCtx.strokeStyle = summoned ? "rgba(255, 236, 190, 0.96)" : "rgba(255, 236, 190, 0.78)";
+        targetCtx.lineWidth = summoned ? 3 : 2;
+        targetCtx.strokeRect(-w / 2 + 7, -h / 2 + 7, w - 14, h - 14);
+        targetCtx.strokeStyle = "rgba(255, 255, 255, 0.28)";
+        targetCtx.strokeRect(-w / 2 + 17, -h / 2 + 17, w - 34, h - 34);
+
+        if (state === "revealed") {
+          targetCtx.globalAlpha = 0.16;
+          targetCtx.fillStyle = "#fff";
+          targetCtx.fillRect(-w / 2, -h / 2, w, h);
+        }
+        targetCtx.restore();
+      },
+
+      drawBack(targetCtx, w, h, timestamp) {
+        const image = this.assetsReady ? this.assetImages.get(this.backImageSrc) : null;
+        if (image) {
+          drawImageContain(targetCtx, image, -w / 2 + 4, -h / 2 + 4, w - 8, h - 8);
+          return;
+        }
         const gradient = targetCtx.createLinearGradient(-w / 2, -h / 2, w / 2, h / 2);
-        gradient.addColorStop(0, card.colors[0]);
-        gradient.addColorStop(0.52, "#15151f");
-        gradient.addColorStop(1, card.colors[1]);
+        gradient.addColorStop(0, "#101820");
+        gradient.addColorStop(0.52, "#03070c");
+        gradient.addColorStop(1, "#2b213b");
         targetCtx.fillStyle = gradient;
         targetCtx.fillRect(-w / 2 + 5, -h / 2 + 5, w - 10, h - 10);
+        targetCtx.strokeStyle = "rgba(229, 192, 111, 0.52)";
+        targetCtx.lineWidth = 1;
+        for (let i = 0; i < 5; i += 1) {
+          const inset = 18 + i * 10;
+          targetCtx.strokeRect(-w / 2 + inset, -h / 2 + inset, w - inset * 2, h - inset * 2);
+        }
+        targetCtx.fillStyle = "rgba(255, 245, 214, 0.82)";
+        targetCtx.textAlign = "center";
+        targetCtx.textBaseline = "middle";
+        targetCtx.font = `${Math.max(12, w * 0.09)}px Georgia, serif`;
+        targetCtx.fillText("GAZESHARDS", 0, h * 0.32);
+        targetCtx.globalAlpha = 0.45 + Math.sin(timestamp * 0.004) * 0.18;
+        targetCtx.beginPath();
+        targetCtx.arc(0, -h * 0.08, w * 0.2, 0, Math.PI * 2);
+        targetCtx.strokeStyle = "rgba(159, 216, 255, 0.72)";
+        targetCtx.stroke();
+        targetCtx.globalAlpha = 1;
+      },
 
-        targetCtx.strokeStyle = "rgba(255, 236, 190, 0.9)";
-        targetCtx.lineWidth = summoned ? 3 : 2;
-        targetCtx.strokeRect(-w / 2 + 9, -h / 2 + 9, w - 18, h - 18);
-        targetCtx.strokeStyle = "rgba(255, 255, 255, 0.35)";
-        targetCtx.strokeRect(-w / 2 + 18, -h / 2 + 18, w - 36, h - 36);
+      drawFront(targetCtx, card, w, h, summoned) {
+        const image = this.assetsReady ? this.assetImages.get(card.imageSrc) : null;
+        if (image) {
+          const inset = summoned ? 2 : 5;
+          const draw = summoned ? drawImageCover : drawImageContain;
+          draw(targetCtx, image, -w / 2 + inset, -h / 2 + inset, w - inset * 2, h - inset * 2);
+          return;
+        }
+
+        const colors = card.fallbackColors || ["#5b3fd6", "#f6d36c"];
+        const gradient = targetCtx.createLinearGradient(-w / 2, -h / 2, w / 2, h / 2);
+        gradient.addColorStop(0, colors[0]);
+        gradient.addColorStop(0.52, "#101820");
+        gradient.addColorStop(1, colors[1]);
+        targetCtx.fillStyle = gradient;
+        targetCtx.fillRect(-w / 2 + 5, -h / 2 + 5, w - 10, h - 10);
 
         targetCtx.fillStyle = "rgba(255, 245, 214, 0.95)";
         targetCtx.textAlign = "center";
@@ -1818,7 +2116,6 @@
           targetCtx.fillStyle = "#fff";
           targetCtx.fillRect(-w / 2, -h / 2, w, h);
         }
-        targetCtx.restore();
       }
     };
 
@@ -1892,9 +2189,13 @@
         targetCtx.translate(this.x, this.y);
         targetCtx.rotate(this.rotation);
         targetCtx.globalAlpha = this.alpha;
-        targetCtx.shadowColor = "rgba(0, 0, 0, 0.45)";
-        targetCtx.shadowBlur = 18;
-        targetCtx.shadowOffsetY = 10;
+        targetCtx.shadowColor = "rgba(159, 216, 255, 0.20)";
+        targetCtx.shadowBlur = this.isGrabbed ? 26 : 16;
+        targetCtx.shadowOffsetY = 8;
+
+        if (Math.hypot(this.vx, this.vy) > 8) {
+          MysticEffectManager.throwTrail(this.x, this.y, this.vx, this.vy);
+        }
 
         targetCtx.fillStyle = "rgba(0, 0, 0, 0.62)";
         targetCtx.fillRect(-drawW / 2, -drawH / 2, drawW, drawH);
@@ -1921,8 +2222,8 @@
         }
 
         targetCtx.shadowColor = "transparent";
-        targetCtx.strokeStyle = "rgba(255, 255, 255, 0.88)";
-        targetCtx.lineWidth = this.isGrabbed ? 2 : 1.2;
+        targetCtx.strokeStyle = this.isGrabbed ? "rgba(229, 192, 111, 0.98)" : "rgba(159, 216, 255, 0.78)";
+        targetCtx.lineWidth = this.isGrabbed ? 2 : 1.15;
         targetCtx.strokeRect(-drawW / 2, -drawH / 2, drawW, drawH);
 
         targetCtx.globalAlpha = 0.2;
@@ -2027,29 +2328,32 @@
         const liveRects = FaceTracker.getEyeRects();
 
         const count = CONFIG.eyeSlices.initialCount;
-        const baseSize = Math.max(76, Math.min(142, Math.min(AppState.canvasWidth, AppState.canvasHeight) * 0.14));
+        const baseSize = Math.max(62, Math.min(132, Math.min(AppState.canvasWidth, AppState.canvasHeight) * 0.12));
 
         for (let i = 0; i < count; i += 1) {
           const angle = (i / count) * Math.PI * 2;
           const radiusX = AppState.canvasWidth * 0.19;
           const radiusY = AppState.canvasHeight * 0.12;
           const sourceEye = i % 2 === 0 ? "left" : "right";
-          const rect = liveRects.find((eyeRect) => eyeRect.side === sourceEye)
+          const rect = FaceRegionSampler.getRegion(i, liveRects)
+            || liveRects.find((eyeRect) => eyeRect.side === sourceEye)
             || fallbackRects.find((eyeRect) => eyeRect.side === sourceEye)
             || null;
+          const sizeTier = [0.74, 0.92, 1.18, 0.82, 1.34][i % 5];
+          const aspect = [1.42, 1.0, 0.78, 1.18][i % 4];
           this.slices.push(new EyeSlice({
             id: `mock-${i}`,
             x: AppState.canvasWidth * 0.5 + Math.cos(angle) * radiusX,
             y: AppState.canvasHeight * 0.48 + Math.sin(angle) * radiusY,
             homeX: AppState.canvasWidth * 0.5 + Math.cos(angle) * radiusX,
             homeY: AppState.canvasHeight * 0.48 + Math.sin(angle) * radiusY,
-            w: baseSize * (0.86 + (i % 3) * 0.08),
-            h: baseSize * (0.86 + (i % 3) * 0.08),
+            w: baseSize * sizeTier * aspect,
+            h: baseSize * sizeTier / Math.sqrt(aspect),
             vx: Math.sin(angle) * 0.25,
             vy: Math.cos(angle) * 0.22,
             rotation: (i - count / 2) * 0.05,
             angularVelocity: (i % 2 ? 0.006 : -0.006),
-            sourceEye,
+            sourceEye: rect?.side || sourceEye,
             sourceRect: rect
           }));
         }
@@ -2057,7 +2361,7 @@
 
       createSliceFromEyeRect(eyeRect) {
         const id = `eye-${Date.now()}-${this.slices.length}`;
-        const side = Math.max(76, Math.min(156, Math.max(eyeRect.w, eyeRect.h) * 1.45));
+        const side = Math.max(68, Math.min(148, Math.max(eyeRect.w, eyeRect.h) * 1.25));
         const slice = new EyeSlice({
           id,
           x: AppState.canvasWidth * 0.5,
@@ -2087,9 +2391,9 @@
         if (!eyeRects || !eyeRects.length) return;
         this.slices.forEach((slice, index) => {
           const sourceEye = slice.sourceEye || (index % 2 === 0 ? "left" : "right");
-          const rect = eyeRects.find((eyeRect) => eyeRect.side === sourceEye) || eyeRects[index % eyeRects.length];
+          const rect = FaceRegionSampler.getRegion(index, eyeRects) || eyeRects.find((eyeRect) => eyeRect.side === sourceEye) || eyeRects[index % eyeRects.length];
           if (rect) {
-            slice.sourceEye = sourceEye;
+            slice.sourceEye = rect.side || sourceEye;
             slice.sourceRect = rect;
           }
         });
@@ -2264,8 +2568,8 @@
 
         targetCtx.shadowColor = "transparent";
         targetCtx.strokeStyle = this.isGrabbed
-          ? "rgba(248, 255, 150, 0.95)"
-          : "rgba(255, 255, 255, 0.26)";
+          ? "rgba(229, 192, 111, 0.95)"
+          : "rgba(159, 216, 255, 0.42)";
         targetCtx.lineWidth = this.isGrabbed ? 2 : 1;
         targetCtx.strokeRect(-drawW / 2, -drawH / 2, drawW, drawH);
         targetCtx.restore();
@@ -2357,45 +2661,50 @@
         const mediaSize = SourceManager.videoEl ? getMediaSize(SourceManager.videoEl) : null;
 
         const regions = [
-          { x: 0.22, y: 0.06, size: 0.22 },
-          { x: 0.56, y: 0.06, size: 0.22 },
-          { x: 0.26, y: 0.24, size: 0.20 },
-          { x: 0.54, y: 0.24, size: 0.20 },
-          { x: 0.40, y: 0.38, size: 0.22 },
-          { x: 0.18, y: 0.42, size: 0.24 },
-          { x: 0.58, y: 0.42, size: 0.24 },
-          { x: 0.32, y: 0.64, size: 0.22 },
-          { x: 0.52, y: 0.64, size: 0.22 },
-          { x: 0.08, y: 0.22, size: 0.18 },
-          { x: 0.74, y: 0.22, size: 0.18 },
-          { x: 0.12, y: 0.70, size: 0.18 },
-          { x: 0.70, y: 0.70, size: 0.18 },
-          { x: 0.42, y: 0.78, size: 0.18 }
+          { x: 0.28, y: 0.18, w: 0.34, h: 0.16, scale: 1.10 },
+          { x: 0.62, y: 0.20, w: 0.30, h: 0.18, scale: 0.86 },
+          { x: 0.50, y: 0.42, w: 0.22, h: 0.26, scale: 0.78 },
+          { x: 0.30, y: 0.52, w: 0.28, h: 0.24, scale: 1.22 },
+          { x: 0.70, y: 0.52, w: 0.26, h: 0.24, scale: 0.96 },
+          { x: 0.48, y: 0.72, w: 0.34, h: 0.18, scale: 1.16 },
+          { x: 0.48, y: 0.09, w: 0.36, h: 0.16, scale: 0.72 },
+          { x: 0.22, y: 0.74, w: 0.20, h: 0.20, scale: 0.66 },
+          { x: 0.74, y: 0.74, w: 0.20, h: 0.20, scale: 0.82 },
+          { x: 0.18, y: 0.34, w: 0.22, h: 0.18, scale: 0.74 },
+          { x: 0.80, y: 0.34, w: 0.22, h: 0.18, scale: 0.88 },
+          { x: 0.40, y: 0.58, w: 0.24, h: 0.24, scale: 0.92 },
+          { x: 0.60, y: 0.62, w: 0.22, h: 0.22, scale: 0.70 },
+          { x: 0.42, y: 0.86, w: 0.26, h: 0.16, scale: 0.64 },
+          { x: 0.58, y: 0.30, w: 0.20, h: 0.18, scale: 0.76 },
+          { x: 0.34, y: 0.34, w: 0.20, h: 0.18, scale: 0.84 }
         ].slice(0, CONFIG.faceShards.maxCount);
 
         return regions.map((region, index) => {
-          const sourceSide = Math.max(6, Math.min(faceRect.w, faceRect.h) * region.size);
+          const sourceW = Math.max(6, faceRect.w * region.w);
+          const sourceH = Math.max(6, faceRect.h * region.h);
           const centerX = faceRect.x + faceRect.w * region.x;
           const centerY = faceRect.y + faceRect.h * region.y;
-          const maxX = mediaSize ? Math.max(0, mediaSize.width - sourceSide) : Number.POSITIVE_INFINITY;
-          const maxY = mediaSize ? Math.max(0, mediaSize.height - sourceSide) : Number.POSITIVE_INFINITY;
+          const maxX = mediaSize ? Math.max(0, mediaSize.width - sourceW) : Number.POSITIVE_INFINITY;
+          const maxY = mediaSize ? Math.max(0, mediaSize.height - sourceH) : Number.POSITIVE_INFINITY;
           const sourceRect = {
-            x: Math.max(0, Math.min(maxX, centerX - sourceSide * 0.5)),
-            y: Math.max(0, Math.min(maxY, centerY - sourceSide * 0.5)),
-            w: sourceSide,
-            h: sourceSide
+            x: Math.max(0, Math.min(maxX, centerX - sourceW * 0.5)),
+            y: Math.max(0, Math.min(maxY, centerY - sourceH * 0.5)),
+            w: sourceW,
+            h: sourceH,
+            side: `face-${index}`
           };
           const homeX = mapped.x + mapped.w * region.x + Math.sin(index) * 10;
           const homeY = mapped.y + mapped.h * region.y + Math.cos(index * 1.4) * 8;
-          const side = Math.max(34, Math.min(132, Math.min(mapped.w, mapped.h) * region.size * 1.35));
+          const side = Math.max(34, Math.min(138, Math.min(mapped.w, mapped.h) * 0.20 * region.scale));
+          const aspect = Math.max(0.72, Math.min(1.55, region.w / region.h));
           return {
             sourceRect,
             homeX,
             homeY,
             x: homeX + Math.sin(index * 1.8) * 26,
             y: homeY + Math.cos(index * 1.3) * 18,
-            w: side,
-            h: side
+            w: side * Math.sqrt(aspect),
+            h: side / Math.sqrt(aspect)
           };
         });
       },
@@ -2509,6 +2818,18 @@
         };
       },
 
+      getGrabbedShard() {
+        if (!this.grabbedShard) return null;
+        return {
+          id: this.grabbedShard.id,
+          x: this.grabbedShard.x,
+          y: this.grabbedShard.y,
+          w: this.grabbedShard.w * this.grabbedShard.scale,
+          h: this.grabbedShard.h * this.grabbedShard.scale,
+          isGrabbed: this.grabbedShard.isGrabbed
+        };
+      },
+
       reset() {
         this.shards = [];
         this.grabbedShard = null;
@@ -2517,6 +2838,67 @@
         this.frozen = false;
         AppState.faceShardCount = 0;
         AppState.faceShardsFrozen = false;
+      }
+    };
+
+    const CardRevealController = {
+      slotRect: null,
+
+      update(timestamp = performance.now()) {
+        if (AppState.gameEnded || TarotCardManager.cardState !== "faceDown") return;
+        const shard = FaceShardManager.getGrabbedShard();
+        if (!shard || !shard.isGrabbed) {
+          this.resetHover();
+          return;
+        }
+
+        if (!this.isShardInSlot(shard)) {
+          this.resetHover();
+          return;
+        }
+
+        RitualState.selectedShardId = shard.id;
+        RitualState.targetCardId = AppState.currentCardId;
+        if (!RitualState.hoverStartAt) {
+          RitualState.hoverStartAt = timestamp;
+          return;
+        }
+
+        if (timestamp - RitualState.hoverStartAt >= CONFIG.tarotDeck.revealHoldMs) {
+          this.triggerReveal(timestamp);
+        }
+      },
+
+      isShardInSlot(shard) {
+        const rect = this.slotRect || TarotCardManager.getLayout().rect;
+        if (!rect || !shard) return false;
+        const padding = Math.min(rect.w, rect.h) * 0.12;
+        const expanded = {
+          x: rect.x - padding,
+          y: rect.y - padding,
+          w: rect.w + padding * 2,
+          h: rect.h + padding * 2
+        };
+        return shard.x >= expanded.x
+          && shard.x <= expanded.x + expanded.w
+          && shard.y >= expanded.y
+          && shard.y <= expanded.y + expanded.h;
+      },
+
+      triggerReveal(timestamp = performance.now()) {
+        if (!TarotCardManager.startReveal(timestamp)) return false;
+        FaceShardManager.triggerFreeze();
+        return true;
+      },
+
+      resetHover() {
+        RitualState.selectedShardId = null;
+        RitualState.hoverStartAt = 0;
+      },
+
+      reset() {
+        this.resetHover();
+        RitualState.revealStartedAt = 0;
       }
     };
 
@@ -2640,6 +3022,245 @@
       targetCtx.restore();
     }
 
+
+    function drawMysticFrame(targetCtx, timestamp) {
+      const width = AppState.canvasWidth;
+      const height = AppState.canvasHeight;
+      const pad = Math.max(14, Math.min(width, height) * 0.018);
+      targetCtx.save();
+      targetCtx.strokeStyle = "rgba(195, 158, 94, 0.62)";
+      targetCtx.lineWidth = 1;
+      targetCtx.strokeRect(pad, pad, width - pad * 2, height - pad * 2);
+      targetCtx.strokeStyle = "rgba(159, 216, 255, 0.16)";
+      targetCtx.strokeRect(pad + 8, pad + 8, width - (pad + 8) * 2, height - (pad + 8) * 2);
+
+      targetCtx.globalAlpha = 0.15;
+      targetCtx.strokeStyle = "rgba(159, 216, 255, 0.34)";
+      const grid = 72;
+      for (let x = pad + ((timestamp * 0.006) % grid); x < width - pad; x += grid) {
+        targetCtx.beginPath();
+        targetCtx.moveTo(x, pad + 8);
+        targetCtx.lineTo(x, height - pad - 8);
+        targetCtx.stroke();
+      }
+      for (let y = pad; y < height - pad; y += grid) {
+        targetCtx.beginPath();
+        targetCtx.moveTo(pad + 8, y);
+        targetCtx.lineTo(width - pad - 8, y);
+        targetCtx.stroke();
+      }
+      targetCtx.globalAlpha = 1;
+      const c = Math.min(70, Math.max(34, Math.min(width, height) * 0.07));
+      [[pad, pad, 1, 1], [width - pad, pad, -1, 1], [width - pad, height - pad, -1, -1], [pad, height - pad, 1, -1]].forEach(([x, y, sx, sy]) => {
+        targetCtx.strokeStyle = "rgba(229, 192, 111, 0.78)";
+        targetCtx.beginPath();
+        targetCtx.moveTo(x, y + sy * c);
+        targetCtx.lineTo(x, y);
+        targetCtx.lineTo(x + sx * c, y);
+        targetCtx.stroke();
+        targetCtx.beginPath();
+        targetCtx.arc(x + sx * c * 0.56, y + sy * c * 0.56, c * 0.22, 0, Math.PI * 2);
+        targetCtx.stroke();
+      });
+      targetCtx.restore();
+    }
+
+    function clamp01(value) {
+      return Math.max(0, Math.min(1, value));
+    }
+
+    function easeOutCubic(value) {
+      const t = clamp01(value);
+      return 1 - Math.pow(1 - t, 3);
+    }
+
+    function drawImageContain(targetCtx, image, x, y, width, height) {
+      if (!image || !image.naturalWidth || !image.naturalHeight) return false;
+      const scale = Math.min(width / image.naturalWidth, height / image.naturalHeight);
+      const drawW = image.naturalWidth * scale;
+      const drawH = image.naturalHeight * scale;
+      const drawX = x + (width - drawW) * 0.5;
+      const drawY = y + (height - drawH) * 0.5;
+      targetCtx.drawImage(image, drawX, drawY, drawW, drawH);
+      return true;
+    }
+
+    function drawImageCover(targetCtx, image, x, y, width, height) {
+      if (!image || !image.naturalWidth || !image.naturalHeight) return false;
+      const scale = Math.max(width / image.naturalWidth, height / image.naturalHeight);
+      const sourceW = width / scale;
+      const sourceH = height / scale;
+      const sourceX = (image.naturalWidth - sourceW) * 0.5;
+      const sourceY = (image.naturalHeight - sourceH) * 0.5;
+      targetCtx.drawImage(image, sourceX, sourceY, sourceW, sourceH, x, y, width, height);
+      return true;
+    }
+
+    function drawObservatoryFrame(targetCtx, x, y, width, height, drawContent) {
+      targetCtx.save();
+      targetCtx.shadowColor = "rgba(0, 0, 0, 0.62)";
+      targetCtx.shadowBlur = 28;
+      targetCtx.fillStyle = "rgba(3, 7, 12, 0.82)";
+      targetCtx.fillRect(x - 14, y - 12, width + 28, height + 24);
+      targetCtx.strokeStyle = "rgba(195, 158, 94, 0.72)";
+      targetCtx.lineWidth = 1.2;
+      targetCtx.strokeRect(x - 14, y - 12, width + 28, height + 24);
+      targetCtx.fillStyle = "rgba(159, 216, 255, 0.05)";
+      targetCtx.fillRect(x, y, width, height);
+      drawContent();
+      targetCtx.shadowColor = "transparent";
+      targetCtx.strokeStyle = "rgba(159, 216, 255, 0.66)";
+      targetCtx.strokeRect(x + 8, y + 6, width - 16, height - 12);
+      targetCtx.globalAlpha = 0.22;
+      targetCtx.fillStyle = "#fff";
+      for (let row = y + 8; row < y + height - 8; row += 4) {
+        targetCtx.fillRect(x + 8, row, width - 16, 1);
+      }
+      targetCtx.globalAlpha = 1;
+      targetCtx.strokeStyle = "rgba(229, 192, 111, 0.74)";
+      targetCtx.beginPath();
+      targetCtx.moveTo(x - 38, y + height * 0.5);
+      targetCtx.lineTo(x - 14, y + height * 0.5);
+      targetCtx.moveTo(x + width + 14, y + height * 0.5);
+      targetCtx.lineTo(x + width + 38, y + height * 0.5);
+      targetCtx.stroke();
+      targetCtx.restore();
+    }
+
+    function drawSummoningSlot(targetCtx, x, y, w, h, timestamp, summoned) {
+      targetCtx.save();
+      targetCtx.translate(x, y);
+      const r = Math.max(w, h) * (summoned ? 0.82 : 0.72);
+      targetCtx.globalAlpha = summoned ? 0.72 : 0.42;
+      targetCtx.strokeStyle = "rgba(229, 192, 111, 0.56)";
+      targetCtx.lineWidth = 1;
+      for (let i = 0; i < 4; i += 1) {
+        targetCtx.beginPath();
+        targetCtx.arc(0, 0, r * (0.46 + i * 0.16), 0, Math.PI * 2);
+        targetCtx.stroke();
+      }
+      const count = summoned ? 16 : 10;
+      for (let i = 0; i < count; i += 1) {
+        const angle = timestamp * 0.00035 + (i / count) * Math.PI * 2;
+        const px = Math.cos(angle) * r * 0.74;
+        const py = Math.sin(angle) * r * 0.74;
+        targetCtx.fillStyle = i % 2 ? "rgba(159, 216, 255, 0.72)" : "rgba(229, 192, 111, 0.82)";
+        targetCtx.beginPath();
+        targetCtx.arc(px, py, i % 3 === 0 ? 2.2 : 1.4, 0, Math.PI * 2);
+        targetCtx.fill();
+      }
+      targetCtx.globalAlpha = summoned ? 0.24 : 0.14;
+      const glow = targetCtx.createRadialGradient(0, h * 0.43, 4, 0, h * 0.43, w * 0.72);
+      glow.addColorStop(0, "rgba(229, 192, 111, 0.74)");
+      glow.addColorStop(1, "rgba(229, 192, 111, 0)");
+      targetCtx.fillStyle = glow;
+      targetCtx.fillRect(-w, h * 0.18, w * 2, h * 0.55);
+      targetCtx.restore();
+    }
+
+    const MysticEffectManager = {
+      sparks: [],
+      threads: [],
+      waves: [],
+
+      pinchDown(x, y) {
+        this.sparks.push({ x, y, life: 0.42, maxLife: 0.42, size: 18, type: "knot" });
+        ParticleManager.emit(x, y, 10, "blink");
+      },
+
+      pinchDrag(x, y) {
+        const last = this.threads[this.threads.length - 1];
+        if (!last || Math.hypot(last.x - x, last.y - y) > 8) {
+          this.threads.push({ x, y, life: 0.55, maxLife: 0.55 });
+        }
+      },
+
+      pinchUp(vx, vy) {
+        const speed = Math.hypot(vx, vy);
+        const x = this.threads.length ? this.threads[this.threads.length - 1].x : AppState.canvasWidth * 0.5;
+        const y = this.threads.length ? this.threads[this.threads.length - 1].y : AppState.canvasHeight * 0.5;
+        ParticleManager.emit(x, y, speed > 10 ? 22 : 12, "blink");
+      },
+
+      throwTrail(x, y, vx, vy) {
+        if (Math.random() > 0.35) return;
+        this.threads.push({ x: x - vx * 1.6, y: y - vy * 1.6, life: 0.32, maxLife: 0.32 });
+      },
+
+      openPalm() {
+        this.waves.push({ x: AppState.canvasWidth * 0.5, y: AppState.canvasHeight * 0.52, r: 40, life: 0.9, maxLife: 0.9, type: "tarot" });
+      },
+
+      blink() {
+        AppState.screenFlash = Math.max(AppState.screenFlash, 0.55);
+        this.sparks.push({ x: AppState.canvasWidth * 0.5, y: AppState.canvasHeight * 0.44, life: 0.28, maxLife: 0.28, size: 90, type: "flash" });
+      },
+
+      tripleBlink() {
+        AppState.screenFlash = 1;
+        this.waves.push({ x: AppState.canvasWidth * 0.5, y: AppState.canvasHeight * 0.5, r: 80, life: 1.4, maxLife: 1.4, type: "fool" });
+      },
+
+      update(dt) {
+        this.sparks.forEach((spark) => { spark.life -= dt; spark.size += dt * 34; });
+        this.threads.forEach((thread) => { thread.life -= dt; });
+        this.waves.forEach((wave) => { wave.life -= dt; wave.r += dt * (wave.type === "fool" ? 230 : 170); });
+        this.sparks = this.sparks.filter((spark) => spark.life > 0).slice(-50);
+        this.threads = this.threads.filter((thread) => thread.life > 0).slice(-120);
+        this.waves = this.waves.filter((wave) => wave.life > 0).slice(-8);
+        AppState.screenFlash = Math.max(0, AppState.screenFlash - dt * 2.8);
+      },
+
+      draw(targetCtx) {
+        targetCtx.save();
+        this.threads.forEach((thread, index) => {
+          const alpha = Math.max(0, thread.life / thread.maxLife);
+          const prev = this.threads[index - 1];
+          if (!prev) return;
+          targetCtx.strokeStyle = `rgba(159, 216, 255, ${alpha * 0.42})`;
+          targetCtx.lineWidth = 1;
+          targetCtx.beginPath();
+          targetCtx.moveTo(prev.x, prev.y);
+          targetCtx.lineTo(thread.x, thread.y);
+          targetCtx.stroke();
+        });
+        this.waves.forEach((wave) => {
+          const alpha = Math.max(0, wave.life / wave.maxLife);
+          targetCtx.strokeStyle = wave.type === "fool" ? `rgba(229, 192, 111, ${alpha * 0.72})` : `rgba(159, 216, 255, ${alpha * 0.46})`;
+          targetCtx.lineWidth = wave.type === "fool" ? 2 : 1;
+          for (let i = 0; i < 3; i += 1) {
+            targetCtx.beginPath();
+            targetCtx.arc(wave.x, wave.y, wave.r + i * 22, 0, Math.PI * 2);
+            targetCtx.stroke();
+          }
+        });
+        this.sparks.forEach((spark) => {
+          const alpha = Math.max(0, spark.life / spark.maxLife);
+          targetCtx.strokeStyle = spark.type === "flash" ? `rgba(255, 255, 255, ${alpha * 0.62})` : `rgba(159, 216, 255, ${alpha})`;
+          targetCtx.lineWidth = 1;
+          targetCtx.beginPath();
+          targetCtx.arc(spark.x, spark.y, spark.size * (1 - alpha * 0.4), 0, Math.PI * 2);
+          targetCtx.stroke();
+          targetCtx.fillStyle = `rgba(255, 255, 255, ${alpha * 0.88})`;
+          targetCtx.beginPath();
+          targetCtx.arc(spark.x, spark.y, 2 + alpha * 3, 0, Math.PI * 2);
+          targetCtx.fill();
+        });
+        if (AppState.screenFlash > 0) {
+          targetCtx.globalAlpha = Math.min(0.85, AppState.screenFlash);
+          targetCtx.fillStyle = "#fff";
+          targetCtx.fillRect(0, 0, AppState.canvasWidth, AppState.canvasHeight);
+        }
+        targetCtx.restore();
+      },
+
+      clear() {
+        this.sparks = [];
+        this.threads = [];
+        this.waves = [];
+      }
+    };
+
     function resizeCanvas() {
       const width = window.innerWidth;
       const height = window.innerHeight;
@@ -2735,12 +3356,17 @@
       FaceShardManager.update(dt);
       EyeSliceManager.update(dt);
       ParticleManager.update(dt);
+      MysticEffectManager.update(dt);
+      CardRevealController.update(timestamp);
+      TarotCardManager.update(timestamp);
       FaceShardManager.draw(ctx);
       AppState.lastRenderLayers.push("face-shards");
       EyeSliceManager.draw(ctx);
       AppState.lastRenderLayers.push("slices");
       ParticleManager.draw(ctx);
+      MysticEffectManager.draw(ctx);
       drawVisualAtmosphere(ctx, timestamp);
+      drawMysticFrame(ctx, timestamp);
       TarotCardManager.draw(ctx, timestamp);
       AppState.lastRenderLayers.push("tarot");
       TopEyePreview.draw(ctx);
@@ -2801,15 +3427,22 @@
       event.preventDefault();
     }
 
+    function wait(ms) {
+      return new Promise((resolve) => window.setTimeout(resolve, ms));
+    }
+
     async function startExperience() {
       startBtn.disabled = true;
-      startBtn.textContent = "正在启动...";
+      startBtn.textContent = "正在揭幕...";
       setPhase("loading");
-      startOverlay.classList.add("hidden");
+      startOverlay.classList.add("is-opening");
       startBtn.blur();
       AppState.startedAt = performance.now();
 
+      const curtainOpening = wait(760);
       await SourceManager.startCamera();
+      await curtainOpening;
+      startOverlay.classList.add("hidden");
       VisionEngine.init({ hand: true, face: true }).catch((error) => {
         const message = `识别模型后台加载失败：${error.message || "未知错误"}`;
         AppState.errors.push(message);
@@ -2818,8 +3451,8 @@
 
       setPhase("running");
       showGuide();
-      showToast("捏合手指抓住眼睛切片，拖动甩开；眨眼触发重组。");
-      startBtn.textContent = "开始体验";
+      showToast("拖动脸部碎片进入左侧塔罗槽，停留片刻即可揭幕。");
+      startBtn.textContent = "揭开这个世界";
       startBtn.disabled = false;
     }
 
@@ -2871,6 +3504,11 @@
       flipCameraBtn.blur();
     });
 
+    restartBtn.addEventListener("click", () => {
+      resetVisualElements();
+      restartBtn.blur();
+    });
+
     mediaUpload.addEventListener("change", async () => {
       const file = mediaUpload.files && mediaUpload.files[0];
       await SourceManager.handleUpload(file);
@@ -2918,7 +3556,7 @@
         : "无";
 
       debugPanel.textContent = [
-        "眸影碎境 阶段 8",
+        "眸影碎境 阶段 10 / V0.4",
         `阶段: ${AppState.phase}`,
         `帧率: ${AppState.fps.toFixed(1)}`,
         `画布: ${AppState.canvasWidth} x ${AppState.canvasHeight}`,
@@ -2945,10 +3583,14 @@
         `切片数量: ${EyeSliceManager.slices.length}`,
         `脸部碎片: ${AppState.faceShardCount}`,
         `碎片冻结: ${formatBool(AppState.faceShardsFrozen)}`,
-        `塔罗卡: ${TarotCardManager.cards[AppState.currentCardIndex]?.zh || "无"}`,
+        `待揭示牌: ${TarotCardManager.cards[AppState.currentCardIndex]?.zh || "无"}`,
+        `塔罗状态: ${AppState.cardState}`,
+        `塔罗图片: ${AppState.tarotAssetsReady ? "真实资产" : (AppState.tarotAssetsFailed ? "程序化回退" : "加载中")}`,
+        `仪式碎片: ${RitualState.selectedShardId || "无"}`,
+        `入槽停留: ${RitualState.hoverStartAt ? `${Math.max(0, performance.now() - RitualState.hoverStartAt).toFixed(0)}ms` : "0ms"}`,
         `结束态: ${formatBool(AppState.gameEnded)}`,
         `粒子数量: ${ParticleManager.particles.length}`,
-        `正在抓取: ${formatBool(Boolean(EyeSliceManager.grabbedSlice))}`,
+        `正在抓取: ${formatBool(Boolean(EyeSliceManager.grabbedSlice || FaceShardManager.grabbedShard))}`,
         `运行: ${uptime}s`,
         `最近错误: ${latestError}`
       ].join("\n");
@@ -2958,6 +3600,7 @@
     EyeSliceManager.init();
     CameraStylePipeline.setGrayscale(CONFIG.visualStyle.grayscaleEnabled);
     TarotCardManager.reset();
+    TarotCardManager.preloadTarotAssets();
     setPhase("ready");
     requestAnimationFrame(animationLoop);
   </script>

@@ -212,6 +212,13 @@
       border-color: transparent;
     }
 
+    #soundToggleBtn {
+      width: 46px;
+      min-width: 46px;
+      padding: 0;
+      font-size: 18px;
+    }
+
     #controls {
       position: fixed;
       right: max(18px, env(safe-area-inset-right));
@@ -397,6 +404,12 @@
         min-width: 0;
       }
 
+      #soundToggleBtn {
+        flex: 0 0 54px;
+        width: 54px;
+        min-width: 54px;
+      }
+
       body.ui-hidden #controls {
         left: auto;
       }
@@ -437,13 +450,14 @@
 
   <div id="startOverlay">
     <div class="startPanel">
-      <h1>眸影碎境</h1>
-      <p>揭开这个世界，用脸部碎片唤醒左侧塔罗牌；三次眨眼仍会召唤愚者。</p>
-      <button id="startBtn" class="primaryButton" type="button">揭开这个世界</button>
+      <h1>灵视档案馆</h1>
+      <p>交出一块脸部碎片，打开你的隐藏档案。</p>
+      <button id="startBtn" class="primaryButton" type="button">开启灵视</button>
     </div>
   </div>
 
   <div id="controls">
+    <button id="soundToggleBtn" class="controlButton stageControl" type="button" aria-pressed="true" title="声音开关">♪</button>
     <button id="toggleUiBtn" class="controlButton" type="button">隐藏界面</button>
     <button id="toggleDebugBtn" class="controlButton stageControl" type="button">关闭调试</button>
     <button id="recordModeBtn" class="controlButton stageControl" type="button">录屏模式</button>
@@ -458,7 +472,7 @@
   </div>
 
   <div id="debugPanel"></div>
-  <div id="guidePanel" class="hidden">捏合或拖动脸部碎片，把它送入左侧塔罗槽并停留片刻。张掌切换待揭示牌，三次眨眼召唤愚者。</div>
+  <div id="guidePanel" class="hidden">捏住一块脸部碎片，拖入左侧卡牌背面。</div>
   <div id="toast" role="status" aria-live="polite"></div>
 
   <script>
@@ -558,6 +572,7 @@
     const startOverlay = document.getElementById("startOverlay");
     const startBtn = document.getElementById("startBtn");
     const controls = document.getElementById("controls");
+    const soundToggleBtn = document.getElementById("soundToggleBtn");
     const toggleUiBtn = document.getElementById("toggleUiBtn");
     const toggleDebugBtn = document.getElementById("toggleDebugBtn");
     const recordModeBtn = document.getElementById("recordModeBtn");
@@ -623,6 +638,16 @@
       cardState: "faceDown",
       tarotAssetsReady: false,
       tarotAssetsFailed: false,
+      hasRevealedArchive: false,
+      selectedRegionType: "unknown",
+      archiveVerdictTitle: "",
+      archiveVerdictBody: "",
+      archiveReading: false,
+      archiveGenerated: false,
+      spiritArchive: "V0.5",
+      audioReady: false,
+      audioEnabled: true,
+      audioBlocked: false,
       lastOpenPalmTime: 0,
       blinkComboCount: 0,
       gameEnded: false,
@@ -634,8 +659,89 @@
     const RitualState = {
       selectedShardId: null,
       hoverStartAt: 0,
-      targetCardId: "fool",
+      targetCardId: "justice",
       revealStartedAt: 0
+    };
+
+    const AudioManager = {
+      audio: null,
+      ready: false,
+      enabled: true,
+      volume: 0.35,
+      src: "assets/Harry_Potter_-_Theme_Song_Hedwig_s_Theme_(mp3.pm).mp3",
+
+      init() {
+        if (this.audio) return;
+        this.audio = new Audio(this.src);
+        this.audio.loop = true;
+        this.audio.preload = "auto";
+        this.audio.volume = this.volume;
+        this.audio.onplaying = () => {
+          this.ready = true;
+          AppState.audioReady = true;
+          AppState.audioBlocked = false;
+          this.updateButton();
+        };
+        this.audio.onerror = () => {
+          AppState.audioBlocked = true;
+          this.updateButton();
+        };
+        AppState.audioEnabled = this.enabled;
+      },
+
+      async start() {
+        this.init();
+        if (!this.enabled || !this.audio) return false;
+        try {
+          this.audio.volume = this.volume;
+          const result = await Promise.race([
+            this.audio.play().then(() => "playing"),
+            new Promise((resolve) => window.setTimeout(() => resolve("timeout"), 1200))
+          ]);
+          if (result === "timeout") {
+            AppState.audioBlocked = true;
+            this.updateButton();
+            showToast("声音被浏览器拦截，可点击声音按钮开启。");
+            return false;
+          }
+          this.ready = true;
+          AppState.audioReady = true;
+          AppState.audioBlocked = false;
+          this.updateButton();
+          return true;
+        } catch (error) {
+          AppState.audioBlocked = true;
+          AppState.errors.push(`BGM 播放失败：${error.message || "未知错误"}`);
+          showToast("声音被浏览器拦截，可点击声音按钮开启。");
+          this.updateButton();
+          return false;
+        }
+      },
+
+      toggle() {
+        this.init();
+        this.enabled = !this.enabled;
+        AppState.audioEnabled = this.enabled;
+        if (!this.enabled) {
+          this.audio.pause();
+          this.updateButton();
+          showToast("声音已关闭。");
+          return;
+        }
+        this.start();
+      },
+
+      setVolume(value) {
+        this.volume = Math.max(0, Math.min(1, value));
+        if (this.audio) this.audio.volume = this.volume;
+      },
+
+      updateButton() {
+        if (!soundToggleBtn) return;
+        soundToggleBtn.textContent = this.enabled ? "♪" : "×";
+        soundToggleBtn.classList.toggle("is-active", this.enabled);
+        soundToggleBtn.setAttribute("aria-pressed", String(this.enabled));
+      }
     };
 
     // =====================================================
@@ -1422,12 +1528,12 @@
       if (AppState.gameEnded) return false;
       AppState.lastPinchEvent = "PINCH_DOWN";
       MysticEffectManager.pinchDown(x, y);
-      if (EyeSliceManager.grabAt(x, y)) {
-        AppState.grabbedTarget = "eye";
-        return true;
-      }
       if (FaceShardManager.grabAt(x, y)) {
         AppState.grabbedTarget = "face";
+        return true;
+      }
+      if (EyeSliceManager.grabAt(x, y)) {
+        AppState.grabbedTarget = "eye";
         return true;
       }
       AppState.grabbedTarget = null;
@@ -1817,7 +1923,6 @@
 
     const TarotCardManager = {
       cards: [
-        { id: "fool", zh: "愚者", en: "THE FOOL", imageSrc: "assets/thefool_character.png", fallbackColors: ["#5b3fd6", "#f6d36c"], mark: "0" },
         { id: "justice", zh: "正义", en: "JUSTICE", imageSrc: "assets/justice_character.png", fallbackColors: ["#194f7a", "#f0f3ff"], mark: "XI" },
         { id: "hanged", zh: "倒吊人", en: "THE HANGED MAN", imageSrc: "assets/thehangedman_character.png", fallbackColors: ["#30323f", "#d95f50"], mark: "XII" },
         { id: "sun", zh: "太阳", en: "THE SUN", imageSrc: "assets/sun_character.png", fallbackColors: ["#f6b13d", "#fff0a8"], mark: "XIX" },
@@ -1826,6 +1931,7 @@
         { id: "star", zh: "星星", en: "THE STAR", imageSrc: "assets/star__character.png", fallbackColors: ["#173a8a", "#9fd4ff"], mark: "XVII" },
         { id: "moon", zh: "月亮", en: "THE MOON", imageSrc: "assets/moon_character.png", fallbackColors: ["#32205f", "#d9c6ff"], mark: "XVIII" }
       ],
+      foolCard: { id: "fool", zh: "愚者", en: "THE FOOL", imageSrc: "assets/thefool_character.png", fallbackColors: ["#5b3fd6", "#f6d36c"], mark: "0" },
       backImageSrc: "assets/card_back.png",
       assetImages: new Map(),
       assetLoadPromise: null,
@@ -1846,12 +1952,18 @@
         RitualState.hoverStartAt = 0;
         RitualState.selectedShardId = null;
         RitualState.revealStartedAt = 0;
+        AppState.hasRevealedArchive = false;
+        AppState.selectedRegionType = "unknown";
+        AppState.archiveReading = false;
+        AppState.archiveGenerated = false;
+        ArchiveVerdictManager.reset();
+        FoolEasterEgg.reset();
         this.setCurrent(CONFIG.tarotDeck.currentIndex || 0);
       },
 
       preloadTarotAssets() {
         if (this.assetLoadPromise) return this.assetLoadPromise;
-        const sources = [this.backImageSrc, ...this.cards.map((card) => card.imageSrc)];
+        const sources = [this.backImageSrc, this.foolCard.imageSrc, ...this.cards.map((card) => card.imageSrc)];
         this.assetLoadPromise = Promise.all(sources.map((src) => new Promise((resolve) => {
           const image = new Image();
           image.onload = () => {
@@ -1894,55 +2006,75 @@
           this.cardState = "faceDown";
           this.revealStartedAt = 0;
           AppState.cardState = this.cardState;
+          AppState.hasRevealedArchive = false;
+          AppState.archiveGenerated = false;
           RitualState.revealStartedAt = 0;
         }
       },
 
       nextCard(timestamp = performance.now()) {
         if (!CONFIG.tarotDeck.enabled || AppState.gameEnded) return;
+        if (this.cardState === "revealing") return;
         if (timestamp - this.lastSwitchTime < CONFIG.tarotDeck.switchCooldownMs) return;
         this.lastSwitchTime = timestamp;
         this.setCurrent(AppState.currentCardIndex + 1);
         CardRevealController.reset();
+        ArchiveVerdictManager.reset();
+        FoolEasterEgg.reset();
         showToast(`待揭示牌：${this.cards[AppState.currentCardIndex].zh}`);
       },
 
       registerBlink(timestamp = performance.now()) {
-        if (AppState.gameEnded) return;
-        if (timestamp - this.lastComboBlinkTime > CONFIG.blinkCombo.windowMs) {
-          AppState.blinkComboCount = 0;
-        }
-        this.lastComboBlinkTime = timestamp;
-        AppState.blinkComboCount += 1;
-        if (AppState.blinkComboCount >= CONFIG.blinkCombo.requiredCount) {
-          this.summonFool(timestamp);
-        }
+        return FoolEasterEgg.registerBlink(timestamp);
       },
 
       summonFool(timestamp = performance.now()) {
-        this.setCurrent(0, { keepState: true });
         this.cardState = "summoned";
         AppState.cardState = this.cardState;
+        AppState.currentCardId = this.foolCard.id;
         AppState.gameEnded = true;
         AppState.blinkComboCount = CONFIG.blinkCombo.requiredCount;
         this.summonStartedAt = timestamp;
+        ArchiveVerdictManager.setResult(this.foolCard, AppState.selectedRegionType || "unknown");
         FaceShardManager.triggerFreeze();
         MysticEffectManager.tripleBlink(timestamp);
         restartBtn.classList.add("visible");
         ParticleManager.emit(AppState.canvasWidth * 0.5, AppState.canvasHeight * 0.5, 42, "face");
-        showToast("愚者已被召唤。");
+        showToast("异常档案：愚者已注视你。");
       },
 
-      startReveal(timestamp = performance.now()) {
+      startReveal(timestamp = performance.now(), shard = null) {
         if (AppState.gameEnded || this.cardState !== "faceDown") return false;
+        const regionType = shard?.regionType || "unknown";
+        this.selectCardForRegion(regionType);
+        AppState.selectedRegionType = regionType;
         this.cardState = "revealing";
         this.revealStartedAt = timestamp;
         AppState.cardState = this.cardState;
+        AppState.archiveReading = false;
         RitualState.revealStartedAt = timestamp;
         MysticEffectManager.openPalm(timestamp);
         ParticleManager.emit(AppState.canvasWidth * 0.115, AppState.canvasHeight * 0.56, 24, "face");
-        showToast(`揭示：${this.cards[AppState.currentCardIndex].zh}`);
+        showToast(`档案正在读取：${this.cards[AppState.currentCardIndex].zh}`);
         return true;
+      },
+
+      selectCardForRegion(regionType) {
+        const preference = {
+          eye: ["moon", "star", "hermit"],
+          mouth: ["magician", "sun"],
+          forehead: ["justice", "hanged"],
+          brow: ["justice", "hermit"],
+          nose: ["moon", "hermit"],
+          jaw: ["hanged", "justice"],
+          cheek: ["star", "sun"]
+        };
+        const candidates = preference[regionType] || [];
+        if (!candidates.length) return;
+        const offset = AppState.currentCardIndex % candidates.length;
+        const targetId = candidates[offset];
+        const nextIndex = this.cards.findIndex((card) => card.id === targetId);
+        if (nextIndex >= 0) this.setCurrent(nextIndex, { keepState: true });
       },
 
       update(timestamp = performance.now()) {
@@ -1950,7 +2082,12 @@
         if (timestamp - this.revealStartedAt >= CONFIG.tarotDeck.revealDurationMs) {
           this.cardState = "revealed";
           AppState.cardState = this.cardState;
+          AppState.hasRevealedArchive = true;
+          AppState.archiveGenerated = true;
+          ArchiveVerdictManager.registerOrdinaryReveal(this.cards[AppState.currentCardIndex], AppState.selectedRegionType);
+          FoolEasterEgg.enabled = true;
           CardRevealController.reset();
+          showToast("身份档案已生成。");
         }
       },
 
@@ -1962,23 +2099,30 @@
 
       getLayout() {
         const cardRatio = 1920 / 1088;
+        const mobile = AppState.canvasWidth < 600;
         const baseW = AppState.gameEnded
           ? Math.min(310, AppState.canvasWidth * 0.42, AppState.canvasHeight * 0.34)
-          : Math.min(178, Math.max(108, AppState.canvasWidth * 0.13));
+          : mobile
+            ? Math.min(126, Math.max(96, AppState.canvasWidth * 0.32))
+            : Math.min(178, Math.max(108, AppState.canvasWidth * 0.13));
         const w = baseW;
         const h = w * cardRatio;
         const x = AppState.gameEnded
           ? AppState.canvasWidth * 0.5
-          : Math.max(42 + w * 0.5, AppState.canvasWidth * 0.115);
+          : mobile
+            ? Math.max(30 + w * 0.5, AppState.canvasWidth * 0.22)
+            : Math.max(42 + w * 0.5, AppState.canvasWidth * 0.115);
         const y = AppState.gameEnded
           ? AppState.canvasHeight * 0.52
-          : AppState.canvasHeight * 0.56;
+          : mobile
+            ? AppState.canvasHeight * 0.44
+            : AppState.canvasHeight * 0.56;
         return { x, y, w, h, rect: { x: x - w / 2, y: y - h / 2, w, h } };
       },
 
       draw(targetCtx, timestamp) {
         if (!CONFIG.tarotDeck.enabled) return;
-        const card = this.cards[AppState.currentCardIndex] || this.cards[0];
+        const card = this.getCurrentCard();
         const layout = this.getLayout();
         const w = layout.w;
         const h = layout.h;
@@ -1986,6 +2130,11 @@
         CardRevealController.slotRect = layout.rect;
         drawSummoningSlot(targetCtx, layout.x, layout.y, w, h, timestamp, AppState.gameEnded);
         this.drawCard(targetCtx, card, layout.x, layout.y, w * pulse, h * pulse, timestamp);
+      },
+
+      getCurrentCard() {
+        if (this.cardState === "summoned" || AppState.currentCardId === this.foolCard.id) return this.foolCard;
+        return this.cards[AppState.currentCardIndex] || this.cards[0];
       },
 
       drawCard(targetCtx, card, x, y, w, h, timestamp) {
@@ -2119,6 +2268,134 @@
       }
     };
 
+    const ArchiveVerdictManager = {
+      verdicts: {
+        justice: "你寻找的不是公平，而是可执行的秩序。",
+        hanged: "你不是停在原地，而是在换一种角度等待。",
+        sun: "你把光带给别人，也把阴影留给自己。",
+        magician: "你擅长制造入口，也擅长隐藏代价。",
+        hermit: "你退后一步，不是逃离，而是为了看清。",
+        star: "你相信远处的光，所以还能继续走。",
+        moon: "你害怕的不是黑夜，而是黑夜里的自己。",
+        fool: "你没有被归档，你正在改写档案。"
+      },
+      regionCopy: {
+        eye: "观察证据",
+        mouth: "表达证据",
+        forehead: "秩序证据",
+        cheek: "面具证据",
+        brow: "边界证据",
+        nose: "直觉证据",
+        jaw: "意志证据",
+        unknown: "未知证据"
+      },
+
+      registerOrdinaryReveal(card, regionType = "unknown") {
+        this.setResult(card, regionType);
+        FoolEasterEgg.enabled = true;
+      },
+
+      setResult(card, regionType = "unknown") {
+        AppState.archiveVerdictTitle = `你的灵视档案：${card.zh}`;
+        AppState.archiveVerdictBody = this.verdicts[card.id] || "";
+        AppState.selectedRegionType = regionType;
+      },
+
+      reset() {
+        AppState.archiveVerdictTitle = "";
+        AppState.archiveVerdictBody = "";
+        AppState.archiveGenerated = false;
+        AppState.archiveReading = false;
+      },
+
+      draw(targetCtx, timestamp) {
+        if (!AppState.archiveVerdictTitle && !AppState.archiveReading) return;
+        const layout = TarotCardManager.getLayout();
+        const mobile = AppState.canvasWidth < 600;
+        const width = mobile ? Math.min(330, AppState.canvasWidth - 48) : Math.min(390, AppState.canvasWidth * 0.32);
+        const height = AppState.archiveVerdictBody ? 92 : 54;
+        const x = mobile ? (AppState.canvasWidth - width) * 0.5 : Math.min(AppState.canvasWidth - width - 28, layout.rect.x + layout.rect.w + 32);
+        const y = mobile ? layout.rect.y + layout.rect.h + 14 : layout.rect.y + Math.max(10, layout.rect.h * 0.12);
+
+        targetCtx.save();
+        targetCtx.globalAlpha = AppState.gameEnded ? 0.96 : 0.9;
+        targetCtx.shadowColor = AppState.gameEnded ? "rgba(229, 192, 111, 0.45)" : "rgba(0, 0, 0, 0.48)";
+        targetCtx.shadowBlur = 22;
+        targetCtx.fillStyle = "rgba(3, 7, 12, 0.78)";
+        targetCtx.fillRect(x, y, width, height);
+        targetCtx.shadowColor = "transparent";
+        targetCtx.strokeStyle = AppState.gameEnded ? "rgba(229, 192, 111, 0.86)" : "rgba(159, 216, 255, 0.58)";
+        targetCtx.strokeRect(x + 0.5, y + 0.5, width - 1, height - 1);
+
+        targetCtx.fillStyle = "rgba(229, 192, 111, 0.92)";
+        targetCtx.font = "13px Georgia, 'Microsoft YaHei', serif";
+        targetCtx.textAlign = "left";
+        targetCtx.textBaseline = "top";
+        const title = AppState.archiveReading ? "档案正在读取..." : AppState.archiveVerdictTitle;
+        targetCtx.fillText(title, x + 16, y + 13);
+
+        if (AppState.archiveVerdictBody) {
+          targetCtx.fillStyle = "rgba(255, 255, 255, 0.88)";
+          targetCtx.font = "14px 'Microsoft YaHei', sans-serif";
+          this.drawWrappedText(targetCtx, AppState.archiveVerdictBody, x + 16, y + 40, width - 32, 22);
+          targetCtx.fillStyle = "rgba(159, 216, 255, 0.72)";
+          targetCtx.font = "11px 'Microsoft YaHei', sans-serif";
+          targetCtx.fillText(this.regionCopy[AppState.selectedRegionType] || this.regionCopy.unknown, x + 16, y + height - 20);
+        } else {
+          const pulse = 0.45 + Math.sin(timestamp * 0.008) * 0.25;
+          targetCtx.fillStyle = `rgba(159, 216, 255, ${pulse})`;
+          targetCtx.fillRect(x + 16, y + 37, width - 32, 1);
+        }
+        targetCtx.restore();
+      },
+
+      drawWrappedText(targetCtx, text, x, y, maxWidth, lineHeight) {
+        let line = "";
+        let lineCount = 0;
+        for (const char of text) {
+          const test = line + char;
+          if (targetCtx.measureText(test).width > maxWidth && line) {
+            targetCtx.fillText(line, x, y + lineCount * lineHeight);
+            line = char;
+            lineCount += 1;
+          } else {
+            line = test;
+          }
+          if (lineCount >= 1) break;
+        }
+        if (line) targetCtx.fillText(line, x, y + lineCount * lineHeight);
+      }
+    };
+
+    const FoolEasterEgg = {
+      enabled: false,
+      blinkCount: 0,
+      windowStartedAt: 0,
+
+      registerBlink(timestamp = performance.now()) {
+        if (!this.enabled || !AppState.hasRevealedArchive || TarotCardManager.cardState !== "revealed" || AppState.gameEnded) return false;
+        if (!this.windowStartedAt || timestamp - this.windowStartedAt > 2000) {
+          this.windowStartedAt = timestamp;
+          this.blinkCount = 0;
+        }
+        this.blinkCount += 1;
+        AppState.blinkComboCount = this.blinkCount;
+        if (this.blinkCount >= CONFIG.blinkCombo.requiredCount) {
+          this.enabled = false;
+          TarotCardManager.summonFool(timestamp);
+          return true;
+        }
+        return false;
+      },
+
+      reset() {
+        this.enabled = false;
+        this.blinkCount = 0;
+        this.windowStartedAt = 0;
+        AppState.blinkComboCount = 0;
+      }
+    };
+
     class EyeSlice {
       constructor(options) {
         this.id = options.id;
@@ -2128,6 +2405,7 @@
         this.homeY = options.homeY || options.y;
         this.w = options.w;
         this.h = options.h;
+        this.regionType = options.regionType || "unknown";
 
         this.vx = options.vx || 0;
         this.vy = options.vy || 0;
@@ -2640,6 +2918,7 @@
           shard.homeY = next.homeY;
           shard.w = next.w;
           shard.h = next.h;
+          shard.regionType = next.regionType;
         });
       },
 
@@ -2661,22 +2940,22 @@
         const mediaSize = SourceManager.videoEl ? getMediaSize(SourceManager.videoEl) : null;
 
         const regions = [
-          { x: 0.28, y: 0.18, w: 0.34, h: 0.16, scale: 1.10 },
-          { x: 0.62, y: 0.20, w: 0.30, h: 0.18, scale: 0.86 },
-          { x: 0.50, y: 0.42, w: 0.22, h: 0.26, scale: 0.78 },
-          { x: 0.30, y: 0.52, w: 0.28, h: 0.24, scale: 1.22 },
-          { x: 0.70, y: 0.52, w: 0.26, h: 0.24, scale: 0.96 },
-          { x: 0.48, y: 0.72, w: 0.34, h: 0.18, scale: 1.16 },
-          { x: 0.48, y: 0.09, w: 0.36, h: 0.16, scale: 0.72 },
-          { x: 0.22, y: 0.74, w: 0.20, h: 0.20, scale: 0.66 },
-          { x: 0.74, y: 0.74, w: 0.20, h: 0.20, scale: 0.82 },
-          { x: 0.18, y: 0.34, w: 0.22, h: 0.18, scale: 0.74 },
-          { x: 0.80, y: 0.34, w: 0.22, h: 0.18, scale: 0.88 },
-          { x: 0.40, y: 0.58, w: 0.24, h: 0.24, scale: 0.92 },
-          { x: 0.60, y: 0.62, w: 0.22, h: 0.22, scale: 0.70 },
-          { x: 0.42, y: 0.86, w: 0.26, h: 0.16, scale: 0.64 },
-          { x: 0.58, y: 0.30, w: 0.20, h: 0.18, scale: 0.76 },
-          { x: 0.34, y: 0.34, w: 0.20, h: 0.18, scale: 0.84 }
+          { x: 0.28, y: 0.18, w: 0.34, h: 0.16, scale: 1.10, regionType: "eye" },
+          { x: 0.62, y: 0.20, w: 0.30, h: 0.18, scale: 0.86, regionType: "eye" },
+          { x: 0.50, y: 0.42, w: 0.22, h: 0.26, scale: 0.78, regionType: "nose" },
+          { x: 0.30, y: 0.52, w: 0.28, h: 0.24, scale: 1.22, regionType: "cheek" },
+          { x: 0.70, y: 0.52, w: 0.26, h: 0.24, scale: 0.96, regionType: "cheek" },
+          { x: 0.48, y: 0.72, w: 0.34, h: 0.18, scale: 1.16, regionType: "mouth" },
+          { x: 0.48, y: 0.09, w: 0.36, h: 0.16, scale: 0.72, regionType: "forehead" },
+          { x: 0.22, y: 0.74, w: 0.20, h: 0.20, scale: 0.66, regionType: "jaw" },
+          { x: 0.74, y: 0.74, w: 0.20, h: 0.20, scale: 0.82, regionType: "jaw" },
+          { x: 0.18, y: 0.34, w: 0.22, h: 0.18, scale: 0.74, regionType: "brow" },
+          { x: 0.80, y: 0.34, w: 0.22, h: 0.18, scale: 0.88, regionType: "brow" },
+          { x: 0.40, y: 0.58, w: 0.24, h: 0.24, scale: 0.92, regionType: "cheek" },
+          { x: 0.60, y: 0.62, w: 0.22, h: 0.22, scale: 0.70, regionType: "cheek" },
+          { x: 0.42, y: 0.86, w: 0.26, h: 0.16, scale: 0.64, regionType: "jaw" },
+          { x: 0.58, y: 0.30, w: 0.20, h: 0.18, scale: 0.76, regionType: "brow" },
+          { x: 0.34, y: 0.34, w: 0.20, h: 0.18, scale: 0.84, regionType: "brow" }
         ].slice(0, CONFIG.faceShards.maxCount);
 
         return regions.map((region, index) => {
@@ -2704,13 +2983,44 @@
             x: homeX + Math.sin(index * 1.8) * 26,
             y: homeY + Math.cos(index * 1.3) * 18,
             w: side * Math.sqrt(aspect),
-            h: side / Math.sqrt(aspect)
+            h: side / Math.sqrt(aspect),
+            regionType: region.regionType || "unknown"
           };
         });
       },
 
       update(dt) {
+        if (!this.shards.length && AppState.phase === "running" && !AppState.cameraReady) {
+          this.createMockShards();
+        }
         this.shards.forEach((shard) => shard.update(dt));
+        AppState.faceShardCount = this.shards.length;
+      },
+
+      createMockShards() {
+        const regionTypes = ["eye", "mouth", "forehead", "cheek", "brow", "nose", "jaw"];
+        const count = Math.min(7, CONFIG.faceShards.maxCount);
+        this.shards = Array.from({ length: count }, (_, index) => {
+          const angle = (index / count) * Math.PI * 2;
+          const x = AppState.canvasWidth * 0.5 + Math.cos(angle) * AppState.canvasWidth * 0.17;
+          const y = AppState.canvasHeight * 0.48 + Math.sin(angle) * AppState.canvasHeight * 0.11;
+          const side = Math.max(48, Math.min(92, AppState.canvasWidth * 0.13));
+          return new FaceShard({
+            id: `archive-mock-${index}`,
+            sourceRect: null,
+            regionType: regionTypes[index % regionTypes.length],
+            x,
+            y,
+            homeX: x,
+            homeY: y,
+            w: side * (index % 2 ? 1.15 : 0.92),
+            h: side,
+            vx: Math.cos(angle) * 0.28,
+            vy: Math.sin(angle) * 0.22,
+            rotation: (index - 3) * 0.04,
+            angularVelocity: index % 2 ? 0.004 : -0.004
+          });
+        });
         AppState.faceShardCount = this.shards.length;
       },
 
@@ -2826,7 +3136,8 @@
           y: this.grabbedShard.y,
           w: this.grabbedShard.w * this.grabbedShard.scale,
           h: this.grabbedShard.h * this.grabbedShard.scale,
-          isGrabbed: this.grabbedShard.isGrabbed
+          isGrabbed: this.grabbedShard.isGrabbed,
+          regionType: this.grabbedShard.regionType || "unknown"
         };
       },
 
@@ -2861,6 +3172,8 @@
         RitualState.targetCardId = AppState.currentCardId;
         if (!RitualState.hoverStartAt) {
           RitualState.hoverStartAt = timestamp;
+          AppState.archiveReading = true;
+          showToast("档案正在读取...");
           return;
         }
 
@@ -2886,7 +3199,8 @@
       },
 
       triggerReveal(timestamp = performance.now()) {
-        if (!TarotCardManager.startReveal(timestamp)) return false;
+        const shard = FaceShardManager.getGrabbedShard();
+        if (!TarotCardManager.startReveal(timestamp, shard)) return false;
         FaceShardManager.triggerFreeze();
         return true;
       },
@@ -2894,6 +3208,9 @@
       resetHover() {
         RitualState.selectedShardId = null;
         RitualState.hoverStartAt = 0;
+        if (TarotCardManager.cardState === "faceDown") {
+          AppState.archiveReading = false;
+        }
       },
 
       reset() {
@@ -3368,6 +3685,7 @@
       drawVisualAtmosphere(ctx, timestamp);
       drawMysticFrame(ctx, timestamp);
       TarotCardManager.draw(ctx, timestamp);
+      ArchiveVerdictManager.draw(ctx, timestamp);
       AppState.lastRenderLayers.push("tarot");
       TopEyePreview.draw(ctx);
       AppState.lastRenderLayers.push("top-eye");
@@ -3433,7 +3751,7 @@
 
     async function startExperience() {
       startBtn.disabled = true;
-      startBtn.textContent = "正在揭幕...";
+      startBtn.textContent = "正在开启...";
       setPhase("loading");
       startOverlay.classList.add("is-opening");
       startBtn.blur();
@@ -3451,13 +3769,19 @@
 
       setPhase("running");
       showGuide();
-      showToast("拖动脸部碎片进入左侧塔罗槽，停留片刻即可揭幕。");
-      startBtn.textContent = "揭开这个世界";
+      showToast("捏住一块脸部碎片，拖入左侧卡牌背面。");
+      startBtn.textContent = "开启灵视";
       startBtn.disabled = false;
     }
 
     startBtn.addEventListener("click", async () => {
+      await AudioManager.start();
       await startExperience();
+    });
+
+    soundToggleBtn.addEventListener("click", () => {
+      AudioManager.toggle();
+      soundToggleBtn.blur();
     });
 
     toggleUiBtn.addEventListener("click", () => {
@@ -3556,7 +3880,7 @@
         : "无";
 
       debugPanel.textContent = [
-        "眸影碎境 阶段 10 / V0.4",
+        "灵视档案馆 V0.5",
         `阶段: ${AppState.phase}`,
         `帧率: ${AppState.fps.toFixed(1)}`,
         `画布: ${AppState.canvasWidth} x ${AppState.canvasHeight}`,
@@ -3583,10 +3907,14 @@
         `切片数量: ${EyeSliceManager.slices.length}`,
         `脸部碎片: ${AppState.faceShardCount}`,
         `碎片冻结: ${formatBool(AppState.faceShardsFrozen)}`,
-        `待揭示牌: ${TarotCardManager.cards[AppState.currentCardIndex]?.zh || "无"}`,
+        `待揭示牌: ${TarotCardManager.getCurrentCard()?.zh || "无"}`,
         `塔罗状态: ${AppState.cardState}`,
         `塔罗图片: ${AppState.tarotAssetsReady ? "真实资产" : (AppState.tarotAssetsFailed ? "程序化回退" : "加载中")}`,
         `仪式碎片: ${RitualState.selectedShardId || "无"}`,
+        `证据类型: ${AppState.selectedRegionType}`,
+        `身份档案: ${AppState.archiveVerdictTitle || "未生成"}`,
+        `愚者彩蛋: ${formatBool(FoolEasterEgg.enabled)}`,
+        `BGM: ${AppState.audioEnabled ? (AppState.audioReady ? "播放中" : "待启动") : "关闭"}`,
         `入槽停留: ${RitualState.hoverStartAt ? `${Math.max(0, performance.now() - RitualState.hoverStartAt).toFixed(0)}ms` : "0ms"}`,
         `结束态: ${formatBool(AppState.gameEnded)}`,
         `粒子数量: ${ParticleManager.particles.length}`,
@@ -3598,6 +3926,7 @@
 
     resizeCanvas();
     EyeSliceManager.init();
+    AudioManager.init();
     CameraStylePipeline.setGrayscale(CONFIG.visualStyle.grayscaleEnabled);
     TarotCardManager.reset();
     TarotCardManager.preloadTarotAssets();
